@@ -1,0 +1,9 @@
+{
+  "appId": "com.nacitwo.nacicrypt",
+  "appName": "Naci Crypt",
+  "webDir": "www",
+  "backgroundColor": "#07090e",
+  "android": {
+    "allowMixedContent": false
+  }
+}

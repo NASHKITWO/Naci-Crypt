@@ -1,0 +1,65 @@
+NACITWO GAMES — LISENSI PROPRIETER (HAK CIPTA DILINDUNGI)
+Naci-Crypt  ·  Versi 1.1
+
+Hak Cipta © 2026 Muhammad Ikhsan (NaciTwo Games). Seluruh hak dilindungi.
+Kontak: ican3192@gmail.com
+Dukungan / donasi: https://sociabuzz.com/nacitwo/tribe
+
+1. CAKUPAN
+   Lisensi ini berlaku untuk karya asli Muhammad Ikhsan ("Pemilik") di repositori ini:
+   kode sumber (www/game.js, www/index.html, www/style.css, scripts/, test/), desain game
+   (aturan, level, musuh, bos, keseimbangan), teks, antarmuka, serta kode pembuat efek
+   suara dan musik. Semua itu disebut "Karya".
+
+2. YANG DIIZINKAN
+   a. Memainkan game secara pribadi.
+   b. Membaca kode untuk belajar, tanpa menyalin atau menyebarkannya.
+   c. Menulis ulasan, video, atau live stream gameplay, selama menyebut NaciTwo / Muhammad Ikhsan
+      dan tidak menyiratkan bahwa kamu pembuat atau pemegang hak game ini.
+
+3. YANG DILARANG tanpa izin tertulis dari Pemilik
+   a. Menyalin, memperbanyak, menyebarkan, mengunggah ulang, atau menjual Karya, utuh maupun sebagian.
+   b. Memodifikasi atau membuat karya turunan (termasuk "reskin", port, atau mod) lalu
+      menyebarkannya, baik gratis maupun berbayar.
+   c. Menerbitkan Karya atau turunannya di toko aplikasi (Google Play, App Store, dll.)
+      atas nama pihak lain.
+   d. Menghapus atau mengubah pernyataan hak cipta, kredit, atau tautan dukungan.
+   e. Mengambil Karya untuk melatih sistem AI atau dataset tanpa izin.
+   f. Mengklaim Karya sebagai milik sendiri.
+
+4. ASET PIHAK KETIGA (DIKECUALIKAN)
+   Lisensi ini TIDAK memberi hak atas aset pihak ketiga. Aset tersebut tetap milik pembuatnya
+   dan tunduk pada lisensi masing-masing:
+   - Pixel Crawler (Free Pack) oleh Anokolisa
+   - DarkDungeon dan Mini Dungeon Tileset (Atomic Realm Assets)
+   - RPG Items 16x16 Pack 1 dan Crystals and Ore 24x24
+   Aset-aset ini umumnya boleh dipakai dan diubah di dalam game, tetapi TIDAK boleh dipaketkan
+   ulang, dijual, atau disebarkan sebagai aset itu sendiri. Karena aset tertanam di
+   www/index.html, www/assets.js, dan www/assets2.js, repositori ini harus tetap PRIVATE dan
+   file-file tersebut tidak boleh dipublikasikan terpisah.
+
+5. KEPEMILIKAN
+   Karya dilisensikan, bukan dijual. Semua hak yang tidak diberikan secara tegas di sini
+   tetap dimiliki Pemilik.
+
+6. TANPA GARANSI
+   Karya diberikan "apa adanya", tanpa jaminan apa pun. Pemilik tidak bertanggung jawab atas
+   kerugian yang timbul dari penggunaan Karya, sejauh diizinkan hukum yang berlaku.
+
+7. PELANGGARAN
+   Pelanggaran syarat di atas mengakhiri izin yang diberikan dan dapat ditindak sesuai hukum
+   yang berlaku, termasuk Undang-Undang Hak Cipta Republik Indonesia (UU No. 28 Tahun 2014).
+
+8. DUKUNGAN
+   Kalau kamu menikmati game ini, dukunglah pembuatnya: https://sociabuzz.com/nacitwo/tribe
+
+--------------------------------------------------------------------------------
+ENGLISH SUMMARY
+Copyright (c) 2026 Muhammad Ikhsan (NaciTwo Games). All rights reserved. The original code,
+game design, text and UI of Naci-Crypt may be played and read for personal use only. Copying,
+redistributing, selling, publishing modified versions, publishing to app stores under another
+name, removing credits, or using the work for AI training is prohibited without written
+permission. Third-party art assets (Pixel Crawler, DarkDungeon, Mini Dungeon Tileset,
+RPG Items 16x16, Crystals and Ore 24x24) are NOT covered and remain under their owners' terms;
+they must not be repackaged or redistributed. Provided "as is", without warranty.
+In case of any difference between the two texts, the Indonesian text prevails.

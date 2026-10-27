@@ -1,0 +1,128 @@
+<!-- Naci-Crypt (c) 2026 Muhammad Ikhsan / NaciTwo Games. Hak cipta dilindungi, lihat LICENSE. -->
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Naci Crypt</title>
+<meta name="theme-color" content="#07090e">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="touch">
+  <div class="tc" id="stick"><div id="knob"></div></div>
+  <div class="tc tb" id="tDash">DASH</div>
+  <div class="tc tb" id="tAtk">SERANG</div>
+  <div class="tc tb" id="tPower"><span class="lb" id="tPowerL">POWER</span><span class="pn" id="tPowerN"></span></div>
+  <div class="tc tb" id="tSwap">GANTI</div>
+  <div class="tc" id="tPause">II</div>
+</div>
+
+<div id="lbar">
+  <div class="lr"><div class="lt">ATUR TOMBOL</div><div class="lw" id="lWarn"></div></div>
+  <div class="lh">Seret tombol untuk memindahkan. Ketuk tombol untuk memilih, lalu ubah ukuran dan transparansinya. GESER SEMUA memindahkan semua tombol sekaligus.</div>
+  <div class="lr"><span class="szgrp"><button class="b" id="lMinus">&minus;</button><span id="lInfo"></span><button class="b" id="lPlus">+</button></span><button class="b" id="lOp">TRANSPARAN</button><button class="b" id="lOpAll">SAMAKAN</button></div>
+  <div class="lr"><button class="b" id="lSnap">GRID</button><button class="b" id="lGroup">GESER SEMUA</button><button class="b" id="lFix">RAPIKAN</button><button class="b" id="lUndo">UNDO</button><button class="b" id="lReset">RESET</button></div>
+  <div class="lr"><button class="b" id="lCancel">BATAL</button><button class="b" id="lFlip">PINDAH BAR</button><button class="b pri" id="lDone">SELESAI</button></div>
+</div>
+
+<div class="screen on" id="splash">
+  <div class="nt" id="spTitle">NaciTwo games</div>
+  <div class="sp-track"><div class="sp-ground"></div><div class="sp-run" id="spRun"></div></div>
+  <div class="by">Founder &amp; Developer<br>Muhammad Ikhsan</div>
+  <div class="sp-load"><i></i></div>
+  <div class="sp-tap">SENTUH UNTUK LEWATI</div>
+</div>
+
+<div class="screen" id="title">
+  <div class="brand">NaciTwo games presents</div>
+  <h1 class="logo">NACI<br> CRYPT</h1>
+  <p class="sub">Turun ke dalam kripta. Kalahkan kerangka dan orc, rebut kunci dari penjaga bersinar emas, lalu hadapi Raja Orc di lantai terakhir.</p>
+  <div class="btns">
+    <button class="b pri" id="bPlay">MULAI MAIN</button>
+    <button class="b" id="bHow">CARA BERMAIN</button>
+    <button class="b" id="bLayout">ATUR TOMBOL</button>
+    <button class="b" id="bCred">KREDIT</button>
+    <button class="b" id="bDonate">DUKUNG SAYA</button>
+  </div>
+  <div class="sub" id="best"></div>
+  <div class="foot">&copy; 2026 NaciTwo games &middot; Muhammad Ikhsan</div>
+</div>
+
+<div class="screen" id="how">
+  <div class="card">
+    <h3>CARA BERMAIN</h3>
+    <div><span class="k">Gerak</span> &nbsp;<kbd>W A S D</kbd> / <kbd>&larr;&uarr;&darr;&rarr;</kbd></div>
+    <div><span class="k">Serang</span> &nbsp;<kbd>SPASI</kbd> / <kbd>J</kbd> / klik kiri (arah ke kursor)</div>
+    <div><span class="k">Dash</span> &nbsp;<kbd>SHIFT</kbd> / <kbd>K</kbd> &mdash; kebal sesaat</div>
+    <div><span class="k">Ganti senjata</span> &nbsp;<kbd>Q</kbd> / <kbd>1</kbd>&ndash;<kbd>5</kbd> / roda mouse</div>
+    <div><span class="k">Power</span> &nbsp;<kbd>E</kbd> / <kbd>L</kbd> pakai, <kbd>R</kbd> ganti power</div>
+    <div><span class="k">Jeda</span> &nbsp;<kbd>P</kbd> / <kbd>ESC</kbd> &nbsp; <span class="k">Suara</span> <kbd>M</kbd></div>
+    <div class="m">Layar sentuh: joystick + SERANG / DASH / GANTI (senjata) / POWER (ketuk panah di sudutnya untuk ganti power). Susun ulang tombol lewat menu ATUR TOMBOL.</div>
+    <br>
+    <div><span class="k">Tujuan:</span> Di lantai 1&ndash;2, kalahkan penjaga <b style="color:var(--gold);font-weight:400">berbingkai emas</b> untuk mendapat kunci, lalu masuk ke portal. Di lantai 3, kalahkan Raja Orc.</div>
+    <div><span class="k">Item:</span> koin &amp; permata = skor, ramuan merah = nyawa, biru = lari cepat, kuning = serangan kuat. Buka peti untuk peningkatan permanen.</div>
+    <div><span class="k">Senjata:</span> Pedang, Tombak (jangkauan jauh), Kapak (putar, keras), Busur, Tongkat api. Dapat senjata yang sama lagi atau peti tertentu = naik level (maks 5). Panah &amp; api bisa menangkis tembakan musuh.</div>
+    <div><span class="k">Power:</span> bola cahaya &mdash; <span style="color:#ff9a4a">Nova</span> ledakan, <span style="color:#ffe14a">Petir</span>, <span style="color:#5ab4ff">Perisai</span>, <span style="color:#9ff0ff">Beku</span>.</div>
+    <div><span class="k">Kristal:</span> pukul / tembak untuk memecahkannya &mdash; jatuh permata &amp; bijih. Nova memecahkan semua kristal di sekitarmu.</div>
+    <div><span class="k">Buku Kuno:</span> ada di lantai 2&ndash;3, memberi peningkatan permanen. Senjata berganti tampilan tiap naik level.</div>
+    <div class="m">Panah emas di dekat karaktermu menunjuk tujuan berikutnya.</div>
+  </div>
+  <div class="btns"><button class="b" data-back>KEMBALI</button></div>
+</div>
+
+<div class="screen" id="credits">
+  <div class="card">
+    <h3>NACITWO GAMES</h3>
+    <div><span class="k">Founder &amp; Developer</span><br>Muhammad Ikhsan</div>
+    <div><span class="k">Kampus</span><br>Universitas Pamulang &mdash; Teknik Informatika</div>
+    <div><span class="k">Kontak</span><br>ican3192@gmail.com</div>
+    <br>
+    <div><span class="k">Aset seni</span><br>Pixel Crawler (Free Pack) oleh Anokolisa<br>DarkDungeon &amp; Mini Dungeon Tileset (Atomic Realm)<br>RPG Items 16x16 &middot; Crystals and Ore 24x24</div>
+    <div class="m">Efek suara &amp; musik dibuat langsung dengan WebAudio.</div>
+    <br>
+    <div><span class="k">Dukung pembuat</span><br><a href="https://sociabuzz.com/nacitwo/tribe" target="_blank" rel="noopener" style="color:inherit">sociabuzz.com/nacitwo/tribe</a></div>
+    <div class="m">&copy; 2026 Muhammad Ikhsan (NaciTwo Games). Hak cipta dilindungi; lihat file LICENSE. Dilarang menyalin, menjual, atau menyebarkan ulang tanpa izin.</div>
+  </div>
+  <div class="btns"><button class="b" data-back>KEMBALI</button></div>
+</div>
+
+<div class="screen" id="pause">
+  <h2 class="logo" style="font-size:clamp(20px,5vw,36px)">JEDA</h2>
+  <div class="btns">
+    <button class="b pri" id="bResume">LANJUT</button>
+    <button class="b" id="bMute">SUARA: HIDUP</button>
+    <button class="b" id="bLayout2">ATUR TOMBOL</button>
+    <button class="b" id="bQuit">KE MENU UTAMA</button>
+  </div>
+</div>
+
+<div class="screen" id="over">
+  <h2 class="logo" style="color:#ff6a5a;text-shadow:0 4px 0 #5a1208;font-size:clamp(22px,6vw,44px)">KAMU GUGUR</h2>
+  <div class="stat" id="overStat"></div>
+  <div class="btns">
+    <button class="b pri" id="bRetry">COBA LAGI</button>
+    <button class="b" id="bMenu1">MENU UTAMA</button>
+  </div>
+</div>
+
+<div class="screen" id="win">
+  <div class="brand">kripta telah ditaklukkan</div>
+  <h2 class="logo" style="font-size:clamp(22px,6vw,44px)">KAMU MENANG!</h2>
+  <div class="stat" id="winStat"></div>
+  <div class="btns">
+    <button class="b pri" id="bAgain">MAIN LAGI</button>
+    <button class="b" id="bMenu2">MENU UTAMA</button>
+  </div>
+  <div class="foot">Terima kasih sudah bermain &middot; NaciTwo games</div>
+</div>
+
+<script src="assets.js"></script>
+<script src="assets2.js"></script>
+<script src="layout.js"></script>
+<script src="pose.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

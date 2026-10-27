@@ -1,0 +1,28 @@
+{
+  "name": "naci-crypt",
+  "version": "1.1.0",
+  "description": "Naci Crypt - dungeon crawler pixel art oleh NaciTwo games",
+  "private": true,
+  "author": "Muhammad Ikhsan <ican3192@gmail.com> (NaciTwo games)",
+  "scripts": {
+    "test": "node --test",
+    "prepare:www": "node scripts/prepare-www.js",
+    "android:add": "cap add android",
+    "android:patch": "node scripts/patch-android.js",
+    "android:sync": "cap sync android",
+    "android:setup": "npm run prepare:www && cap add android && npm run android:patch && cap sync android",
+    "android:open": "cap open android",
+    "serve": "npx --yes http-server www -p 8080 -c-1"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@fontsource/press-start-2p": "^5.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "funding": "https://sociabuzz.com/nacitwo/tribe"
+}
