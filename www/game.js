@@ -153,6 +153,8 @@ addEventListener('keydown',e=>{
   keys[e.code]=true;
   if(e.code==='KeyP'||e.code==='Escape'){ if(state==='play') setPause(true); else if(state==='pause') setPause(false); }
   if(e.code==='KeyM') toggleMute();
+  if(state==='rest'&&!editing&&(e.code==='KeyE'||e.code==='Space')) restInteract();
+  if(state==='rest'&&!editing&&$('dlg').classList.contains('on')&&e.code==='Escape'){ $('dlg').classList.remove('on'); }
   if(state==='play'&&!editing){ if(e.code==='KeyQ')swapWeapon(1); if(e.code==='KeyE'||e.code==='KeyL')usePower(); if(e.code==='KeyR')cyclePower(1);
     const dg=e.code.startsWith('Digit')?+e.code[5]:0; if(dg>=1&&dg<=WLIST.length)setWeapon(WLIST[dg-1]); }
   if((e.code==='ShiftLeft'||e.code==='ShiftRight'||e.code==='KeyK')) dashQ=0.15;
@@ -279,19 +281,44 @@ let floor=1, L=null, P=null, ents=[], corpses=[], pickups=[], chests=[], crystal
 let shake=0, hitstop=0, time=0, msg={t:0,s:''}, bossRef=null, winT=0, overT=0, bestScore=0, kills=0, score=0, runTime=0;
 try{bestScore=parseInt(localStorage.getItem('nacicrypt_best')||'0')||0;}catch(e){}
 
+// kekuatan musuh mengikuti tampilannya: yang sangar (orc besar, tombak, pohon) lebih tebal dan lebih keras
 const EDEF={
-  skWarrior:{hp:4,spd:36,dmg:10,ai:'melee',score:20,coins:[0,2]},
-  skRogue:{hp:3,spd:58,dmg:10,ai:'dasher',score:25,coins:[0,2]},
-  skMage:{hp:3,spd:28,dmg:10,ai:'ranged',score:30,shots:1,cd:2.2,coins:[1,2]},
-  orc:{hp:9,spd:30,dmg:20,ai:'melee',score:45,coins:[1,3]},
-  orcRogue:{hp:6,spd:52,dmg:15,ai:'dasher',score:50,coins:[1,3]},
-  orcShaman:{hp:6,spd:26,dmg:10,ai:'ranged',score:65,shots:3,cd:2.7,coins:[1,3]},
-  orcWarrior:{hp:70,spd:34,dmg:25,ai:'boss',score:1000,scale:2,coins:[10,14]}
+  // tier 1: kecil dan rapuh
+  slime:{hp:3,spd:30,dmg:7,ai:'melee',score:15,coins:[0,2]},
+  skBase:{hp:4,spd:36,dmg:8,ai:'melee',score:20,coins:[0,2]},
+  skRogue:{hp:3,spd:60,dmg:9,ai:'dasher',score:25,coins:[0,2]},
+  // tier 2: standar
+  skWarrior:{hp:6,spd:36,dmg:12,ai:'melee',score:30,coins:[1,2]},
+  skMage:{hp:4,spd:26,dmg:12,ai:'ranged',score:35,shots:1,cd:2.4,coins:[1,2]},
+  orcRogue:{hp:7,spd:56,dmg:13,ai:'dasher',score:40,coins:[1,3]},
+  orcShaman:{hp:6,spd:24,dmg:9,ai:'ranged',score:45,shots:2,cd:2.6,coins:[1,3]},
+  slime2:{hp:8,spd:36,dmg:12,ai:'melee',score:40,coins:[1,3]},
+  // tier 3: sangar, tebal dan keras
+  orc:{hp:16,spd:28,dmg:20,ai:'melee',score:60,coins:[2,4]},
+  orc2:{hp:18,spd:34,dmg:22,ai:'melee',score:70,coins:[2,4]},
+  tree:{hp:12,spd:14,dmg:15,ai:'ranged',score:70,shots:2,cd:2.2,coins:[2,4]},
+  slimeKing:{hp:48,spd:26,dmg:20,ai:'melee',score:160,scale:1.6,coins:[4,7]},
+  // bos
+  orcWarrior:{hp:110,spd:34,dmg:18,ai:'boss',score:1000,scale:2,coins:[10,14]},
+  kingSlime:{hp:150,spd:28,dmg:16,ai:'boss',score:2000,scale:2.2,coins:[12,18]},
+  treeBoss:{hp:190,spd:24,dmg:14,ai:'boss',score:2500,scale:2.2,coins:[14,20]},
+  orc2Boss:{hp:230,spd:34,dmg:14,ai:'boss',score:3000,scale:1.9,coins:[16,24]}
 };
+const BOSS_OF={3:'orcWarrior',6:'kingSlime',9:'treeBoss',10:'orc2Boss'}; // bos per lantai (3, 6, 9 membuka portal; 10 menang)
+const BOSS_NAME={orcWarrior:'RAJA ORC',kingSlime:'RAJA SLIME',treeBoss:'PENJAGA POHON',orc2Boss:'JENDERAL ORC'};
+const FINAL=10; const isBoss=f=>!!BOSS_OF[f];
+const FLOOR_SAY={4:'Lantai 4: Terowongan orc makin dalam. Cari penjaga berbingkai emas.',5:'Lantai 5: Ruang bawah tanah tergenang lendir. Cari kuncinya.',6:'Lantai 6: Singgasana Raja Slime. Kalahkan dia untuk membuka portal.',7:'Lantai 7: Kawah api menyala di bawah kripta. Cari penjaga berbingkai emas.',8:'Lantai 8: Aula tulang yang hangus. Musuhnya lebih ganas.',9:'Lantai 9: Akar kripta. Kalahkan Penjaga Pohon untuk membuka portal.',10:'Lantai 10: Benteng terakhir sang jenderal. Kalahkan Jenderal Orc untuk menang!'};
 const POOL={
-  1:['skWarrior','skWarrior','skWarrior','skRogue','skRogue','skMage'],
-  2:['skWarrior','skRogue','skMage','orc','orc','orcRogue','orcShaman'],
-  3:['orc','orc','orcRogue','orcShaman','orcShaman','skMage','skRogue']
+  1:['slime','slime','skBase','skBase','skRogue','skWarrior','skMage'],
+  2:['skBase','skWarrior','skWarrior','skRogue','skMage','orcRogue','orcShaman','slime2'],
+  3:['orc','orc2','orcRogue','orcShaman','skMage','skWarrior','tree','slime2'],
+  4:['orc','orc2','orc2','skWarrior','skMage','orcShaman','tree','slimeKing'],
+  5:['slime2','slime2','orc2','tree','skBase','orcShaman','skMage','slimeKing'],
+  6:['orc','orc2','tree','orcRogue','skMage','orcShaman','slimeKing'],
+  7:['orc','orc2','orc2','tree','orcRogue','skWarrior','slimeKing','slime2'],
+  8:['orc','orc2','tree','skWarrior','orcShaman','slimeKing','orcRogue'],
+  9:['orc2','tree','orcShaman','skMage','orc','slimeKing'],
+  10:['orc','orc2','orc2','orcShaman','orcRogue','tree','skWarrior']
 };
 
 /* ============ level generation ============ */
@@ -330,7 +357,7 @@ function bfs(Lv,sx,sy){
       if(Lv.grid[n]===1&&d[n]<0){d[n]=d[c]+1;q.push(n);}}}
   return d;
 }
-/* Tema lantai: 1 = kripta gelap (DarkDungeon), 2 = aula batu abu (Mini Dungeon), 3 = kripta bernuansa merah (sarang Raja Orc). 'old' = cadangan kalau aset tambahan gagal dimuat. */
+/* Tema lantai: 1 & 4 = kripta gelap (DarkDungeon), 2 & 5 = aula batu abu (Mini Dungeon), 3 = kripta Crypt_Diffuse (sarang Raja Orc), 6 = kripta merah (Raja Slime). 'old' = cadangan kalau aset tambahan gagal dimuat. */
 function crackAt(x,px,py,hh,a){ if(hh%5)return; x.fillStyle='rgba(0,0,0,'+a+')'; let cx=px+2+(hh>>>3)%11, cy=py+2+(hh>>>7)%11; for(let i=0;i<5+(hh>>>11)%5;i++){ x.fillRect(cx,cy,1,1); cx+=((hh>>>(3+i))&1)?1:-1; cy+=1; } }
 const THEMES={
   dark:{torch:[0,3,3,0,2],
@@ -348,7 +375,37 @@ const THEMES={
     roof:(x,xx,y,hh,px,py)=>{x.drawImage(IMG.wallTiles,112,16,16,16,px,py,16,16);x.fillStyle='rgba(8,10,22,.72)';x.fillRect(px,py,16,16);}}
 };
 THEMES.crypt=Object.assign({},THEMES.dark,{torch:[0,4,5,0],tint:'rgba(80,0,30,.07)'});
-function themeFor(fl){return !IMG.dd?THEMES.old:fl===2&&IMG.mini?THEMES.mini:fl===3?THEMES.crypt:THEMES.dark;}
+// tema 'tomb': lantai dan dinding dari Crypt_Diffuse.png (16x16 Dungeon tileset, Rowan Luff)
+const CRYPT_T={floor:[[9,0],[9,1],[9,3],[9,4],[9,5],[9,6]],face:[[3,0],[4,0],[5,0],[3,1],[4,1],[5,1]]};
+const ctile=(x,t,px,py)=>x.drawImage(IMG.crypt,t[0]*16,t[1]*16,16,16,px,py,16,16);
+THEMES.tomb=Object.assign({},THEMES.crypt,{
+  floor:(x,xx,y,hh,px,py)=>{ctile(x,CRYPT_T.floor[hh%CRYPT_T.floor.length],px,py);crackAt(x,px,py,hh,.22);},
+  face:(x,xx,y,hh,px,py)=>ctile(x,CRYPT_T.face[(hh>>>2)%CRYPT_T.face.length],px,py),
+  roof:(x,xx,y,hh,px,py)=>{ctile(x,CRYPT_T.face[0],px,py);x.fillStyle='rgba(6,4,10,.84)';x.fillRect(px,py,16,16);}});
+// tema lantai 4-5: ubin dari Pixel Crawler (Floors_Tiles.png & Wall_Tiles.png), koordinat dalam satuan 16 px
+const PC_T={bone:{floor:[[16,1],[17,1],[18,1],[16,2],[17,2],[18,2]],face:[[8,2],[9,2],[8,3],[9,3],[10,2],[10,3]]},
+  cave:{floor:[[11,5],[12,5],[13,5]],face:[[2,2],[3,2],[2,3],[3,3],[1,2],[4,2]]}};
+let SMITH_CACHE=null;
+function smithSheet(){ // sprite penempa: sama bentuknya, diberi warna bengkel (coklat tua + sedikit merah)
+  if(SMITH_CACHE) return SMITH_CACHE;
+  const d=SPR.hero2&&SPR.hero2.idle; if(!d) return null;
+  const c=document.createElement('canvas'); c.width=d.img.width; c.height=d.img.height; const x=c.getContext('2d');
+  x.drawImage(d.img,0,0); x.globalCompositeOperation='source-atop'; x.fillStyle='rgba(110,58,30,.72)'; x.fillRect(0,0,c.width,c.height);
+  x.globalCompositeOperation='source-over'; SMITH_CACHE=c; return c;
+}
+const pct=(img,t,x,y,px,py)=>x.drawImage(IMG[img],t[0]*16,t[1]*16,16,16,px,py,16,16);
+function pcTheme(k,base,tint){
+  const T=PC_T[k];
+  return Object.assign({},base,{
+    floor:(x,xx,y,hh,px,py)=>{pct('pcFloors',T.floor[hh%T.floor.length],x,0,px,py);if(tint){x.fillStyle=tint;x.fillRect(px,py,16,16);}},
+    face:(x,xx,y,hh,px,py)=>pct('pcWalls',T.face[(hh>>>2)%T.face.length],x,0,px,py),
+    roof:(x,xx,y,hh,px,py)=>{pct('pcWalls',T.face[0],x,0,px,py);x.fillStyle='rgba(6,4,10,.84)';x.fillRect(px,py,16,16);}});
+}
+THEMES.bone=pcTheme('bone',THEMES.dark,'rgba(40,60,80,.10)');
+THEMES.cave=pcTheme('cave',THEMES.dark,'rgba(60,140,60,.10)');
+THEMES.lava=pcTheme('cave',THEMES.dark,'rgba(230,80,20,.30)');
+THEMES.roots=pcTheme('bone',THEMES.dark,'rgba(40,90,40,.12)');
+function themeFor(fl){return !IMG.dd?THEMES.old:fl===2&&IMG.mini?THEMES.mini:fl===3?(IMG.crypt?THEMES.tomb:THEMES.crypt):fl===4&&IMG.pcFloors?THEMES.bone:fl===5&&IMG.pcFloors?THEMES.cave:fl===6&&IMG.crypt?THEMES.crypt:fl===7&&IMG.pcFloors?THEMES.lava:fl===8&&IMG.pcFloors?THEMES.bone:fl===9&&IMG.crypt?THEMES.tomb:fl===9&&IMG.pcFloors?THEMES.roots:fl===10&&IMG.crypt?THEMES.crypt:THEMES.dark;}
 function prerender(Lv){
   const c=document.createElement('canvas'); c.width=MW*TILE; c.height=MH*TILE; const x=c.getContext('2d'); x.imageSmoothingEnabled=false;
   x.fillStyle='#06080d'; x.fillRect(0,0,c.width,c.height);
@@ -398,7 +455,7 @@ const PDEF={
   beku:{name:'BEKU',col:'#9ff0ff',rgb:'159,240,255',tip:'Membekukan semua musuh'}
 };
 const PLIST=['nova','petir','perisai','beku'];
-const WSPR={}, WGRIP={sword:[3,12],spear:[4,11],axe:[4,11],bow:[4,7],staff:[3,12]};
+const WSPR={}, WGRIP={sword:[13,13],spear:[14,14],axe:[14,14],bow:[4,7],staff:[15,15]}; // titik pegang di gagang (kanan-bawah sprite)
 (function mkBowArt(){ // busur: tidak ada di pack RPG Items, jadi tetap digambar sendiri
   const c=document.createElement('canvas');c.width=14;c.height=13;const x=c.getContext('2d');
   const R=(col,a,b,w,h)=>{x.fillStyle=col;x.fillRect(a,b,w,h);};
@@ -413,7 +470,7 @@ function fallbackW(){const c=mkCv(16,16),x=c.getContext('2d');x.fillStyle='#cfd8
 function heldArt(w,lv){
   if(w==='bow')return {img:WSPR.bow,gx:WGRIP.bow[0],gy:WGRIP.bow[1],rot:0};
   lv=clamp(lv||1,1,5);const key=w+lv;let h=ART.held[key];
-  if(!h){const gr=WGRIP[w];h=ART.held[key]={img:outline(rawW(w,lv)||fallbackW()),gx:gr[0]+1,gy:gr[1]+1,rot:Math.PI/4};}
+  if(!h){const gr=WGRIP[w];h=ART.held[key]={img:outline(rawW(w,lv)||fallbackW()),gx:gr[0]+1,gy:gr[1]+1,rot:3*Math.PI/4};}
   return h;
 }
 function slotArt(w,lv){ // ikon 24x24 untuk HUD dan senjata di lantai
@@ -432,6 +489,7 @@ function usePower(){
   const p=P;if(!p||p.dead||state!=='play'||editing||p.pcd>0)return;
   if(!(p.pw[p.psel]>0)){cyclePower(1,true);if(!(p.pw[p.psel]>0)){say('Belum punya power. Cari bola cahaya!',2);return;}}
   const t=p.psel,cx=p.x,cy=p.y-8,dm=p.dmg*(p.buffDmg>0?1.5:1);
+  fx.push({k:'anim',sp:'chgfx',x:cx,y:cy,t:0,life:.5,scale:1});
   if(t==='nova'){
     fx.push({k:'ring',x:cx,y:cy,r:4,max:84,sp:260,rgb:'255,140,40'});
     for(const e of ents.slice()){const d=hyp(e.x-cx,e.y-cy);if(d<84+(e.scale>1?12:0))damageEnemy(e,dm*3.4,Math.atan2(e.y-cy,e.x-cx),300);}
@@ -473,20 +531,25 @@ function breakCrystal(c){
 }
 function boomFire(q){
   for(const c of crystals.slice())if(hyp(c.x-q.x,(c.y-8)-q.y)<q.rad+6)hitCrystal(c,0,1);
-  fx.push({k:'ring',x:q.x,y:q.y,r:3,max:q.rad,sp:150,rgb:'255,140,40'});addPart(q.x,q.y,16,'#ff9a4a',90,.5,2);addPart(q.x,q.y,8,'#ffe08a',60,.4,2);sfx('hit');shake=Math.max(shake,2);
+  fx.push({k:'ring',x:q.x,y:q.y,r:3,max:q.rad,sp:150,rgb:'255,140,40'});fx.push({k:'anim',sp:'boom2fx',x:q.x,y:q.y-4,t:0,life:.5,scale:Math.max(.8,q.rad/22)});addPart(q.x,q.y,16,'#ff9a4a',90,.5,2);addPart(q.x,q.y,8,'#ffe08a',60,.4,2);sfx('hit');shake=Math.max(shake,2);
   for(const e of ents.slice()){if(hyp(e.x-q.x,(e.y-6*e.scale)-q.y)<q.rad+4*e.scale)damageEnemy(e,q.dmg,Math.atan2(e.y-q.y,e.x-q.x),WDEF.staff.kb);}
 }
 
 /* ============ entities ============ */
+const heroChoice='knight';
+const heroStats=()=>({hp:100,spd:68,dmg:2});
+const heroDef=part=>{const h=SPR[(P&&P.hero)||heroChoice]||SPR.knight;return h&&h[part];};
 function newPlayer(){
-  return {x:0,y:0,vx:0,vy:0,hp:100,maxHp:100,spd:68,dmg:2,face:1,fx:0,fy:1,moving:false,anim:0,
+  const hs=heroStats(heroChoice);
+  return {hero:heroChoice,x:0,y:0,vx:0,vy:0,hp:hs.hp,maxHp:hs.hp,spd:hs.spd,dmg:hs.dmg,face:1,fx:0,fy:1,moving:false,anim:0,
     inv:0,flash:0,atkT:0,atkCD:0,atkAng:0,atkHit:false,dashT:0,dashCD:0,dashX:0,dashY:0,
     buffSpd:0,buffDmg:0,key:false,coins:0,dead:false,deadT:0,kx:0,ky:0,ghost:0,squash:0,stepT:0,
     wpn:'sword',own:{sword:1},wlv:{sword:1},pw:{nova:0,petir:0,perisai:0,beku:0},seenPw:{},psel:'nova',pcd:0,shield:0,shieldHits:0};
 }
 function mkEnemy(type,x,y,o){
-  o=o||{}; const d=EDEF[type];
-  let hp=d.hp*(1+(L.fl-1)*.12); if(o.elite)hp*=2.6;
+  o=o||{}; const d=Object.assign({},EDEF[type]); const bossK=d.ai==='boss'; // bos tidak ikut kenaikan per lantai (sudah diatur per bos)
+  if(!bossK) d.dmg=d.dmg*(1+(L.fl-1)*.05); // kerusakan naik 5% per lantai
+  let hp=d.hp*(bossK?1:(1+(L.fl-1)*.12)); if(o.elite)hp*=2.6;
   return {type,d,x,y,hp,maxHp:hp,t:rf(0,5),cd:rf(.4,1.4),wind:0,alert:false,flash:0,kx:0,ky:0,stun:0,face:1,moving:false,
     elite:!!o.elite,shots:(d.shots||0)+(o.elite?2:0),scale:d.scale||1,mode:'chase',mt:rf(2.5,4),lunge:0,lungeCD:rf(1,3),dx:0,dy:0,enraged:false,summoned:false,boss:d.ai==='boss',
     squash:0,stepT:rf(0,.3),intro:d.ai==='boss'?-1:0};
@@ -526,7 +589,7 @@ function newFloor(){
   L=genLevel(floor); const rooms=L.rooms; const sr=rooms[0];
   const d0=bfs(L,sr.cx,sr.cy);
   let exit=null;
-  if(floor===3){ exit=rooms.slice(1).sort((a,b)=>b.w*b.h-a.w*a.h)[0]; }
+  if(isBoss(floor)){ exit=rooms.slice(1).sort((a,b)=>b.w*b.h-a.w*a.h)[0]; }
   else { let bd=-1; for(const r of rooms.slice(1)){const dd=d0[r.cx+r.cy*MW];if(dd>bd){bd=dd;exit=r;}} }
   L.start=sr; L.exit=exit; L.map=prerender(L);
   L.explored=new Uint8Array(MW*MH); L.mini=document.createElement('canvas'); L.mini.width=MW; L.mini.height=MH; L.miniCtx=L.mini.getContext('2d'); L.miniDirty=true; L.miniT=0;
@@ -536,18 +599,18 @@ function newFloor(){
   L.portal={x:exit.cx*TILE+8,y:exit.cy*TILE+8,open:false};
   const spots=(r,m)=>{const a=[];for(let y=r.y+m;y<r.y+r.h-m;y++)for(let x=r.x+m;x<r.x+r.w-m;x++)a.push([x*TILE+8,y*TILE+12]);return a;};
   const others=rooms.filter(r=>r!==sr&&r!==exit);
-  const eliteRoom=floor<3?pick(others):null;
+  const eliteRoom=!isBoss(floor)?pick(others):null;
   for(const r of rooms){
     if(r===sr) continue;
-    if(r===exit&&floor<3) continue; // portal room stays calm
+    if(r===exit&&!isBoss(floor)) continue; // portal room stays calm
     const sp=spots(r,1); if(!sp.length)continue;
-    let n=floor===3?ri(1,2)+(r.w*r.h>70?1:0):ri(2,3)+(floor>1?1:0)+(r.w*r.h>70?1:0);
-    if(r===exit&&floor===3)n=3;
+    let n=isBoss(floor)?ri(1,2)+(r.w*r.h>70?1:0):ri(2,3)+(floor>1?1:0)+(r.w*r.h>70?1:0);
+    if(r===exit&&isBoss(floor))n=3;
     for(let i=0;i<n;i++){ const s=sp.splice(ri(0,sp.length-1),1)[0]; if(!s)break;
       ents.push(mkEnemy(pick(POOL[floor]),s[0]+rf(-3,3),s[1])); }
     if(r===eliteRoom&&sp.length){ const s=sp.splice(ri(0,sp.length-1),1)[0]; const e=mkEnemy(floor===1?'orc':'orcShaman',s[0],s[1],{elite:true}); ents.push(e); L.elite=e; }
   }
-  if(floor===3){ const e=mkEnemy('orcWarrior',exit.cx*TILE+8,exit.cy*TILE+14); e.alert=false; ents.push(e); bossRef=e; }
+  if(BOSS_OF[floor]){ const e=mkEnemy(BOSS_OF[floor],exit.cx*TILE+8,exit.cy*TILE+14); e.alert=false; ents.push(e); bossRef=e; }
   // potion crates
   const crateRooms=others.filter(r=>r!==eliteRoom).sort(()=>rnd()-.5).slice(0,floor===3?2:2);
   for(const r of crateRooms){const sp=spots(r,1);if(sp.length){const s=pick(sp);chests.push({x:s[0],y:s[1],open:false,t:rf(0,6)});}}
@@ -556,17 +619,18 @@ function newFloor(){
   {
     const pool=others.length?others:rooms.slice(1);
     const place=(type,sub)=>{const r=pick(pool),sp=spots(r,1);if(!sp.length)return;const s=pick(sp),k=mkPick(type,s[0],s[1],0,0,sub);k.life=1e9;pickups.push(k);};
-    for(const w of ({1:['spear'],2:['bow','axe'],3:['staff']})[floor])if(!P.own[w])place('wpn',w);
+    for(const w of (({1:['spear'],2:['bow','axe'],3:['staff']})[floor]||[]))if(!P.own[w])place('wpn',w);
     for(let i=0;i<(floor===3?2:1);i++)place('orb',pick(PLIST));
     if(floor>1)place('book');
   }
   // kristal yang bisa dipecahkan (tidak menghalangi jalan); warnanya mengikuti lantai
   {const pal=({1:[1,2,3,4,8],2:[0,4,7,1,8],3:[5,0,6,5,0]})[floor]||[1,2,8];
-   for(const r of rooms){ if(r===sr||(r===exit&&floor<3))continue; const sp=spots(r,1); const n=Math.min(sp.length,ri(1,2)+(r.w*r.h>70?1:0));
+   for(const r of rooms){ if(r===sr||(r===exit&&!isBoss(floor)))continue; const sp=spots(r,1); const n=Math.min(sp.length,ri(1,2)+(r.w*r.h>70?1:0));
      for(let i=0;i<n;i++){const s=sp.splice(ri(0,sp.length-1),1)[0]; if(!s)break; if(chests.some(c=>hyp(c.x-s[0],c.y-s[1])<20))continue;
        crystals.push({x:s[0],y:s[1],hp:3,maxHp:3,t:rf(0,6),flash:0,shake:0,v:pick(pal)});}}}
   updateFlow(); flowT=0;
-  say(floor===3?'Lantai 3: Sarang Raja Orc. Temukan dan kalahkan dia!':floor===1?'Lantai 1: Cari penjaga berbingkai emas — dia membawa kunci.':'Lantai 2: Kerangka makin ganas. Cari penjaga bersinar emas.',4.5);
+  say(floor===3?'Lantai 3: Sarang Raja Orc. Temukan dan kalahkan dia!':floor===1?'Lantai 1: Cari penjaga berbingkai emas — dia membawa kunci.':'Lantai 2: Kerangka makin ganas. Cari penjaga berbingkai emas.',4.5);
+  if(FLOOR_SAY[floor])say(FLOOR_SAY[floor],4.5);
 }
 let tipMem=false;
 function powerTipSeen(set){if(set){tipMem=true;try{localStorage.setItem('nacicrypt_tip_power','1');}catch(e){}return true;}if(tipMem)return true;try{return localStorage.getItem('nacicrypt_tip_power')==='1';}catch(e){return false;}}
@@ -578,18 +642,19 @@ function addPart(x,y,n,col,sp,life,size,grav){
   for(let i=0;i<n;i++){const a=rnd()*6.283,s=rf(.3,1)*sp;parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-sp*.2,l:life*rf(.6,1),m:life,c:col,s:size||1,gr:grav||0});}
 }
 function addNum(x,y,txt,col){nums.push({x,y,t:0,txt,c:col||'#fff'});}
-function hurtPlayer(dmg,fx,fy){
+function hurtPlayer(dmg,hx,hy){
   if(P.dead||P.inv>0||P.dashT>0) return false;
   if(P.shield>0){P.shieldHits--;P.inv=.45;P.flash=0;if(P.shieldHits<=0)P.shield=0;addPart(P.x,P.y-10,10,'#9fd2ff',80,.4,2);fx.push({k:'ring',x:P.x,y:P.y-8,r:8,max:22,sp:120,rgb:'90,180,255'});sfx('hit');return true;}
   P.hp-=dmg; P.inv=1.0; P.flash=.18; P.squash=1; shake=Math.max(shake,5); hitstop=.05;
-  const a=Math.atan2(P.y-fy,P.x-fx); P.kx=Math.cos(a)*120; P.ky=Math.sin(a)*120;
+  const a=Math.atan2(P.y-hy,P.x-hx); P.kx=Math.cos(a)*120; P.ky=Math.sin(a)*120;
   addPart(P.x,P.y-10,8,'#ff4d4d',70,.5,2); addNum(P.x,P.y-24,'-'+Math.round(dmg),'#ff6a6a'); sfx('hurt');
   if(P.hp<=0){P.hp=0;P.dead=true;P.deadT=0;sfx('lose');
-    corpses.push({def:SPR.knight.death,x:P.x,y:P.y,t:0,flip:P.face<0,scale:1,fade:false,player:true}); overT=0; }
+    corpses.push({def:heroDef('death'),x:P.x,y:P.y,t:0,flip:P.face<0,scale:1,fade:false,player:true}); overT=0; }
   return true;
 }
 function damageEnemy(e,dmg,ang,kb){
   e.hp-=dmg; e.flash=.14; e.squash=1; e.stun=Math.max(e.stun,e.boss?0:.18); e.alert=true;
+  fx.push({k:'anim',sp:e.type.startsWith('orc')?'bloodfx':'hitfx',x:e.x+Math.cos(ang)*6,y:e.y-10*e.scale,t:0,life:.42,scale:e.scale>1?1.5:1.1});
   const k=kb*(e.boss?.18:e.elite?.6:1); e.kx+=Math.cos(ang)*k; e.ky+=Math.sin(ang)*k;
   addPart(e.x,e.y-10*e.scale,6,e.type.startsWith('sk')?'#e8e2c8':'#8fd14f',60,.4,2);
   addNum(e.x+rf(-4,4),e.y-24*e.scale,String(Math.round(dmg*10)/10),'#ffe07a'); sfx('hit'); hitstop=Math.max(hitstop,.04); shake=Math.max(shake,2);
@@ -597,6 +662,8 @@ function damageEnemy(e,dmg,ang,kb){
 }
 function killEnemy(e){
   ents.splice(ents.indexOf(e),1);
+  P.combo=(P.combo||0)+1; P.comboT=3; score+=Math.min(50,P.combo*5);
+  if(e.elite||e.boss||e.scale>1)fx.push({k:'anim',sp:'boomfx',x:e.x,y:e.y-10*e.scale,t:0,life:.6,scale:e.boss?3:e.elite?2:1.6});
   const sp=SPR[e.type]; corpses.push({def:sp.death,x:e.x,y:e.y,t:0,flip:e.face<0,scale:e.scale,fade:true});
   addPart(e.x,e.y-8,14,e.type.startsWith('sk')?'#f2ecd0':'#a0e050',90,.7,2,60);
   sfx('kill'); kills++; score+=e.d.score; addNum(e.x,e.y-34*e.scale,'+'+e.d.score,'#9ff');
@@ -606,9 +673,10 @@ function killEnemy(e){
   if(rnd()<.07){const k=mkPick('orb',e.x,e.y-4,0,0,pick(PLIST));k.life=1e9;pickups.push(k);}
   {if(rnd()<.03){const nw=WLIST.filter(w=>!P.own[w]),k=mkPick('wpn',e.x,e.y-4,0,0,pick(nw.length?nw:WLIST));k.life=1e9;pickups.push(k);}}
   if(e.elite){pickups.push(mkPick('key',e.x,e.y-4,0,0));say('Kunci jatuh! Ambil dan temukan portal.',3.5);L.elite=null;shake=6;}
-  if(e.boss){shake=14;winT=2.6;sfx('boom');addPart(e.x,e.y-20,60,'#ffd24a',170,1.2,2);bossRef=null;for(const o of ents.slice())if(o!==e)killEnemy(o);}
+  if(e.boss){shake=14;sfx('boom');addPart(e.x,e.y-20,60,'#ffd24a',170,1.2,2);bossRef=null;for(const o of ents.slice())if(o!==e)killEnemy(o);
+    if(floor===FINAL)winT=2.6; else {P.key=true;say('Bos tumbang! Portal terbuka.',3.5);}}
 }
-function shoot(e,ang,spd){ projs.push({x:e.x,y:e.y-10,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:3,dmg:e.d.dmg,c:e.type.startsWith('orc')?'#ff9a3a':'#7fe3ff'}); }
+function shoot(e,ang,spd){ projs.push({x:e.x,y:e.y-10,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:3,dmg:e.d.dmg,c:e.type.startsWith('orc')?'#ff9a3a':e.type==='tree'||e.type==='treeBoss'?'#9be05a':e.type==='kingSlime'?'#7fff9a':'#7fe3ff'}); }
 function playerAttack(){
   const W=WDEF[P.wpn], a=P.atkAng, ca=Math.cos(a), sa=Math.sin(a), dm0=P.dmg*W.dm*(1+.15*((P.wlv[P.wpn]||1)-1))*(P.buffDmg>0?1.5:1);
   if(W.type==='bow'){pproj.push({k:'arrow',x:P.x+ca*8,y:P.y-8+sa*8,vx:ca*W.speed,vy:sa*W.speed,life:1.1,dmg:dm0,pierce:1,hit:[],a});sfx('bow');return;}
@@ -629,6 +697,8 @@ function playerAttack(){
 
 /* ============ update ============ */
 function update(dt){
+  if(P&&P.comboT>0){P.comboT-=dt;if(P.comboT<=0)P.combo=0;}
+  if(P&&P.shield>0){P.shT=(P.shT||0)-dt;if(P.shT<=0){P.shT=.3;fx.push({k:'anim',sp:'shieldfx',x:P.x,y:P.y-8,t:0,life:.3,scale:1.1});}}
   time+=dt; runTime+=dt;
   if(msg.t>0)msg.t-=dt;
   // ---- player ----
@@ -692,7 +762,7 @@ function update(dt){
   for(let i=pproj.length-1;i>=0;i--){const q=pproj[i];q.x+=q.vx*dt;q.y+=q.vy*dt;q.life-=dt;let rm=false;
     if(q.k==='fire'&&rnd()<.8)parts.push({x:q.x+rf(-2,2),y:q.y+rf(-2,2),vx:rf(-10,10),vy:rf(-10,10),l:.3,m:.3,c:rnd()<.5?'#ff9a4a':'#ffd27a',s:2,gr:0});
     for(let j=projs.length-1;j>=0&&!rm;j--){const o=projs[j];if(hyp(q.x-o.x,q.y-o.y)<7){addPart(o.x,o.y,5,o.c,50,.3,1);projs.splice(j,1);sfx('hit');if(q.k==='fire'){rm=true;boomFire(q);}else if(q.pierce--<=0)rm=true;}}
-    if(rm){}else if(q.life<=0||solidAt(q.x,q.y)){rm=true;if(q.k==='fire')boomFire(q);else addPart(q.x,q.y,3,'#ddd',40,.2,1);}
+    if(rm){}else if(q.life<=0||solidAt(q.x,q.y)){rm=true;if(q.k==='fire')boomFire(q);else{addPart(q.x,q.y,3,'#ddd',40,.2,1);fx.push({k:'anim',sp:'impfx',x:q.x,y:q.y,t:0,life:.36,scale:1});}}
     else{
       for(const c of crystals.slice()){ if(q.hit&&q.hit.includes(c))continue;
         if(hyp(q.x-c.x,q.y-(c.y-8))<9){ if(q.k==='arrow'){q.hit.push(c);hitCrystal(c,Math.atan2(q.vy,q.vx),1);if(q.pierce--<=0){rm=true;break;}} else{rm=true;boomFire(q);break;} } }
@@ -715,7 +785,7 @@ function update(dt){
   for(const c of chests){c.t+=dt;if(!c.open&&!P.dead&&hyp(P.x-c.x,P.y-c.y)<14)openChest(c);}
   // ---- portal ----
   L.portal.open=P.key;
-  if(!P.dead&&floor<3&&P.key&&hyp(P.x-L.portal.x,P.y-L.portal.y)<13){ nextFloor(); return; }
+  if(!P.dead&&floor!==FINAL&&P.key&&hyp(P.x-L.portal.x,P.y-L.portal.y)<13){ if(floor%3===2){enterRest();return;} nextFloor(); return; }
   // ---- explore ----
   const pcx=P.x/TILE|0,pcy=P.y/TILE|0; let ch=false;
   for(let y=pcy-6;y<=pcy+6;y++)for(let x=pcx-8;x<=pcx+8;x++){ if(x<0||y<0||x>=MW||y>=MH)continue; if((x-pcx)*(x-pcx)/64+(y-pcy)*(y-pcy)/36>1)continue; const n=x+y*MW; if(!L.explored[n]){L.explored[n]=1;ch=true;} }
@@ -732,8 +802,9 @@ function update(dt){
 }
 
 function updateEnemy(e,dt){
+  if(e.type==='skMage'&&(e.auraT=(e.auraT||0)-dt)<=0){e.auraT=.9;fx.push({k:'anim',sp:'animafx',x:e.x,y:e.y-8,t:0,life:.6,scale:.8});} // aura roh penyihir
   e.squash=Math.max(0,e.squash-dt*7);
-  if(e.intro>0){e.intro=Math.max(0,e.intro-dt);shake=Math.max(shake,e.intro>0?2:0);if(e.intro<=0){shake=10;sfx('boom');say('RAJA ORC MUNCUL!',2.2);}}
+  if(e.intro>0){e.intro=Math.max(0,e.intro-dt);shake=Math.max(shake,e.intro>0?2:0);if(e.intro<=0){shake=10;sfx('boom');say((BOSS_NAME[e.type]||'BOS')+' MUNCUL!',2.2);}}
   if(e.freeze>0){e.freeze-=dt;e.moving=false;e.wind=0;e.flash=Math.max(0,e.flash-dt);return;}
   const d=e.d; e.t+=dt; e.flash=Math.max(0,e.flash-dt); e.cd-=dt; e.moving=false;
   if(e.kx||e.ky){moveEnt(e,e.kx*dt,e.ky*dt);e.kx*=Math.pow(.01,dt);e.ky*=Math.pow(.01,dt);if(Math.abs(e.kx)+Math.abs(e.ky)<5)e.kx=e.ky=0;}
@@ -767,20 +838,24 @@ function updateEnemy(e,dt){
       if(vis&&dist<140&&e.cd<=0)e.wind=.5;
       break; }
     case 'boss':{
-      if(!e.enraged&&e.hp<e.maxHp*.5){e.enraged=true;say('Raja Orc murka!',2.5);shake=8;sfx('boom');
+      if(!e.enraged&&e.hp<e.maxHp*.5){e.enraged=true;say((BOSS_NAME[e.type]||'Bos')+' murka!',2.5);shake=8;sfx('boom');
+        if(e.type==='kingSlime'){for(const dx of [-22,22]){ents.push(mkEnemy('slime',e.x+dx,e.y));} say('Raja Slime memecah diri!',2.5);}
         for(let i=0;i<3;i++){const a=i*2.1+rnd();const m=mkEnemy(pick(['skWarrior','skRogue']),e.x+Math.cos(a)*30,e.y+Math.sin(a)*24);m.alert=true;if(!blockedAt(m.x,m.y,5))ents.push(m);}}
       const sp=d.spd*(e.enraged?1.35:1);
       e.mt-=dt;
       if(Math.abs(dx)>3&&e.mode!=='charge')e.face=dx>0?1:-1;
       if(e.mode==='chase'){ if(dist>24)toward(e,sp,dt);
         if(dist<22&&e.cd<=0){ if(hurtPlayer(d.dmg,e.x,e.y))e.cd=1; }
-        if(e.mt<=0){ e.mode=rnd()<.5?'ctele':'stele'; e.mt=e.mode==='ctele'?.75:.9; e.dx=dx/(dist||1); e.dy=dy/(dist||1); }
+        if(e.mt<=0){ const r=rnd(); e.mode=(e.type==='kingSlime'||e.type==='treeBoss')&&r<.34?'lendir':r<.67?'ctele':'stele'; e.mt=e.mode==='ctele'?.75:e.mode==='lendir'?.8:.9; e.dx=dx/(dist||1); e.dy=dy/(dist||1); }
       }else if(e.mode==='ctele'){ e.dx=dx/(dist||1);e.dy=dy/(dist||1); e.flash=(Math.sin(e.t*30)>0)?.35:0; if(e.mt<=0){e.mode='charge';e.mt=.55;sfx('dash');} }
       else if(e.mode==='charge'){ const ox=e.x,oy=e.y; moveEnt(e,e.dx*sp*6*dt,e.dy*sp*6*dt,9); e.moving=true; if(hyp(e.x-ox,e.y-oy)<.2){e.mt=Math.min(e.mt,.05);shake=Math.max(shake,5);}
         if(hyp(P.x-e.x,P.y-e.y)<24)hurtPlayer(d.dmg+5,e.x-e.dx*10,e.y-e.dy*10);
         if(rnd()<.7)parts.push({x:e.x,y:e.y-2,vx:rf(-10,10),vy:rf(-10,0),l:.4,m:.4,c:'rgba(180,170,150,.6)',s:3,gr:0});
         if(e.mt<=0){e.mode='rest';e.mt=.9;} }
       else if(e.mode==='stele'){ e.flash=(Math.sin(e.t*26)>0)?.3:0; if(e.mt<=0){e.mode='rest';e.mt=.9;waves.push({x:e.x,y:e.y,r:6,sp:150,max:84,dmg:20,hit:false});shake=9;sfx('boom');} }
+      else if(e.mode==='lendir'){ // Raja Slime: semburan lendir melingkar (ada tanda getar sebelum keluar)
+        e.flash=(Math.sin(e.t*30)>0)?.3:0;
+        if(e.mt<=0){ const n=e.enraged?10:6, off=rnd()*6.28, dm=e.d.dmg; e.d.dmg=dm*.5; for(let i=0;i<n;i++)shoot(e,off+i/n*6.2832,70); e.d.dmg=dm; /* semburan: tiap getah setengah damage */ sfx('shoot'); shake=6; e.mode='rest'; e.mt=.9; } }
       else if(e.mode==='rest'){ if(e.mt<=0){e.mode='chase';e.mt=rf(2.4,3.6)-(e.enraged?.8:0);} }
       break; }
   }
@@ -793,7 +868,7 @@ function collect(k){
     case 'gemB':score+=100;sfx('gem');addNum(P.x,P.y-26,'+100','#ff9be0');break;
     case 'ore':P.coins+=3;score+=30;sfx('coin');addNum(P.x,P.y-26,'+3 koin','#ffd84a');addPart(P.x,P.y-10,6,'#ffd84a',50,.4,2);break;
     case 'book':sfx('chest');shake=3;addPart(P.x,P.y-12,20,'#ffd84a',90,.7,2);rollUpgrade(P.x,P.y-12,'BUKU KUNO: ');break;
-    case 'potRed':P.hp=Math.min(P.maxHp,P.hp+35);sfx('pot');addNum(P.x,P.y-26,'+35 HP','#7bff7b');addPart(P.x,P.y-10,10,'#ff6a6a',50,.6,2);break;
+    case 'potRed':P.hp=Math.min(P.maxHp,P.hp+35);sfx('pot');fx.push({k:'anim',sp:'puffx',x:P.x,y:P.y-10,t:0,life:.5,scale:.9});addNum(P.x,P.y-26,'+35 HP','#7bff7b');addPart(P.x,P.y-10,10,'#ff6a6a',50,.6,2);break;
     case 'potBlue':P.buffSpd=12;sfx('pot');say('Lari cepat 12 detik!',2);addPart(P.x,P.y-10,10,'#6aa8ff',50,.6,2);break;
     case 'potYellow':P.buffDmg=12;sfx('pot');say('Serangan kuat 12 detik!',2);addPart(P.x,P.y-10,10,'#ffd84a',50,.6,2);break;
     case 'wpn':
@@ -810,7 +885,7 @@ function collect(k){
         P.seenPw[k.sub]=1;say(m,t);}
 addPart(P.x,P.y-12,12,PDEF[k.sub].col,70,.6,2);
       break;
-    case 'key':P.key=true;sfx('key');say(floor<3?'Kunci didapat! Menuju portal...':'Kunci didapat!',3);addPart(P.x,P.y-12,16,'#ffd84a',80,.7,2);break;
+    case 'key':P.key=true;sfx('key');say(floor!==FINAL?'Kunci didapat! Menuju portal...':'Kunci didapat!',3);addPart(P.x,P.y-12,16,'#ffd84a',80,.7,2);break;
   }
 }
 function rollUpgrade(x,y,pre){
@@ -825,10 +900,218 @@ function rollUpgrade(x,y,pre){
   say((pre||'')+o[1],2.6); addNum(x,y-20,o[1],'#fff');
 }
 function openChest(c){
-  c.open=true;sfx('chest');shake=3;addPart(c.x,c.y-8,18,'#ffe07a',90,.7,2);
+  c.open=true;sfx('chest');shake=3;addPart(c.x,c.y-8,18,'#ffe07a',90,.7,2);fx.push({k:'anim',sp:'puffx',x:c.x,y:c.y-8,t:0,life:.6,scale:1.2});
   rollUpgrade(c.x,c.y);
   for(let i=0;i<3;i++)pickups.push(mkPick('coin',c.x,c.y-4)); if(rnd()<.5)pickups.push(mkPick('potRed',c.x,c.y-4));
 }
+// ruang istirahat: sembuhkan, asah senjata, atau isi ulang power sebelum turun
+function enterRest(){ state='rest'; REST.lootOpened=false; REST.barrelOpened=false; sfx('portal'); refreshRest(); showScreen('rest'); $('rtouch').classList.toggle('on',!!touchMode); $('rest').classList.toggle('touch',!!touchMode); }
+// tombol sentuh ditahan untuk jalan; lompat dan interaksi sekali tekan
+const holdBtn=(id,dir)=>{ const b=$(id); const on=e=>{e.preventDefault(); REST.hold=dir;}; const off=()=>{ if(REST.hold===dir) REST.hold=0; };
+  b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointerleave',off); b.addEventListener('pointercancel',off); };
+holdBtn('rbL',-1); holdBtn('rbR',1);
+$('rbJ').addEventListener('pointerdown',e=>{ e.preventDefault(); if(ladderShelf(REST.x)){ REST.climbReq=true; REST.climbT=0.9; } else if(REST.ground&&!(shelfUnder(REST.x)&&REST.y<shelfUnder(REST.x).h-1)){ REST.vy=-262; REST.ground=false; } });
+$('rbE').addEventListener('pointerdown',e=>{ e.preventDefault(); restInteract(); });
+// tampilan dunia ruang istirahat: lantai & dinding batu, lentera menyala, landasan, dan knight
+function drawRestRoom(){
+  const RW=VW*2, cam=clamp(Math.round((REST.x==null?VW*.5:REST.x)-VW/2),0,RW-VW); REST.cam=cam;
+  const wallY=Math.round(VH*.22), floorY=Math.round(VH*.52);
+  g.setTransform(S,0,0,S,0,0); g.imageSmoothingEnabled=false;
+  g.fillStyle='#07090e'; g.fillRect(0,0,VW,VH);
+  g.save(); g.translate(-cam,0);
+  // dinding batu
+  if(IMG.pcWalls) for(let x=0;x<RW;x+=16) for(let y=wallY;y<floorY;y+=16) pct('pcWalls',PC_T.bone.face[((x>>4)+(y>>4))%PC_T.bone.face.length],g,0,x,y);
+  // balok kayu dan bayangan
+  g.fillStyle='#2b1b10'; g.fillRect(0,wallY-7,RW,7); g.fillStyle='rgba(255,200,120,.08)'; g.fillRect(0,wallY-7,RW,1);
+  for(let x=10;x<RW;x+=VW/6){ g.fillStyle='#3a2516'; g.fillRect(Math.round(x),wallY-10,4,13); }
+  g.fillStyle='rgba(0,0,0,.35)'; g.fillRect(0,floorY-6,RW,6);
+  // lantai papan kayu
+  for(let y=floorY,row=0;y<VH+8;y+=8,row++){ g.fillStyle=row%2?'#4a3220':'#533a25'; g.fillRect(0,y,RW,8);
+    g.fillStyle='rgba(0,0,0,.35)'; g.fillRect(0,y+7,RW,1);
+    const lens=[56,40,72,48,64]; let x=(row*17)%40; for(let k=row;x<RW;k++){ x+=lens[k%lens.length]; g.fillRect(x,y,1,8); }
+    g.fillStyle='rgba(255,220,160,.05)'; g.fillRect(0,y,RW,1); }
+  // pembatas antar ruangan: tiang batu di tengah-kanan
+  // pintu lengkung antar ruangan: bingkai kayu, celah gelap, dan sedikit cahaya dari ruang ramuan
+  { const dx=VW-16, dw=32, dt=wallY+6, dh=floorY-dt; g.fillStyle='#3a2516'; g.fillRect(dx-3,dt-3,dw+6,dh+3);
+    g.fillStyle='#0b0c10'; g.fillRect(dx,dt,dw,dh); g.fillStyle='rgba(255,190,110,.10)'; g.fillRect(dx+dw-6,dt,6,dh);
+    g.fillStyle='#c99a3a'; g.fillRect(dx+dw/2-1,dt+dh/2-2,2,4); }
+  // obor di dinding
+  if(IMG.firetorch){const n=Math.max(1,IMG.firetorch.width/20|0); for(const tx of [VW*.2,VW*.8,VW*1.2,VW*1.8]){const fr=Math.floor(time*14+tx*.37)%n; g.drawImage(IMG.firetorch,fr*20,0,20,29,Math.round(tx-20),Math.round(wallY+10-58),40,58);}}
+  // karpet merah di tengah ruang utama
+  g.fillStyle='#5a1d22'; g.beginPath(); g.ellipse(VW*.5,floorY+6,Math.min(96,VW*.22),9,0,0,6.283); g.fill();
+  g.strokeStyle='#c99a3a'; g.lineWidth=1; g.beginPath(); g.ellipse(VW*.5,floorY+6,Math.min(96,VW*.22)-3,6,0,0,6.283); g.stroke();
+  // meja kerja
+  if(IMG.workbench){const mw=IMG.workbench.width*2, mh=IMG.workbench.height*2; g.drawImage(IMG.workbench,Math.round(VW*.5-mw/2-VW*.12),Math.round(floorY-mh+6),mw,mh);}
+  // sudut ramuan: meja alkimia (animasi 11 frame, 48x32) dan rak botol
+  // isi loteng: peti bertumpuk dan tong di sisi kanan loteng
+  { const lt=floorY-44; const cr=(x,y,w,h,c)=>{ g.fillStyle=c; g.fillRect(x,y,w,h); g.fillStyle='rgba(0,0,0,.35)'; g.fillRect(x,y+h-2,w,2); g.fillStyle='#2a1a10'; g.fillRect(x+w/2-1,y,2,h); g.fillStyle='rgba(255,220,160,.12)'; g.fillRect(x,y,w,1); };
+    cr(26,lt-14,18,14,'#6b4424'); cr(30,lt-26,14,12,'#7a4e2b'); // peti tumpuk
+    g.fillStyle='#5a3620'; g.beginPath(); g.ellipse(58,lt-8,7,8,0,0,6.283); g.fill(); g.fillStyle='#3a2516'; g.fillRect(52,lt-12,12,1); g.fillRect(52,lt-5,12,1); }
+  for(const sh of SHELVES){ const x0=sh.x0(), x1=sh.x1(), top=floorY-sh.h; g.fillStyle='#4a3220'; g.fillRect(x0,top,x1-x0,4); g.fillStyle='#2a1a10';
+    g.fillRect(x0+4,top+4,4,sh.h-4); g.fillRect(x1-8,top+4,4,sh.h-4); g.fillStyle='rgba(0,0,0,.35)'; g.fillRect(x0,top+4,x1-x0,2);
+    const lx=sh.lad(); g.fillStyle='#3a2516'; g.fillRect(lx-3,top,2,sh.h); g.fillRect(lx+3,top,2,sh.h);
+    for(let yy=top+6;yy<floorY;yy+=8) g.fillRect(lx-3,yy,8,2); }
+  for(let i=0;i<4;i++){ g.fillStyle=['#7bff7b','#ff9a4a','#9fe8ff','#e05050'][i]; g.fillRect(Math.round(VW*1.44+i*9),floorY-50,4,6); g.fillRect(Math.round(VW*1.92+i*9),floorY-50,4,6); }
+  if(IMG.alchemy){ const n=11, fr=Math.floor(time*6)%n; g.drawImage(IMG.alchemy,fr*48,0,48,32,Math.round(VW*1.6-48),Math.round(floorY-32+4),96,64); }
+  // lentera (bonfire) dengan cahaya dan bara
+  if(IMG.bonfire){ const gl=g.createRadialGradient(VW*.24,floorY-16,4,VW*.24,floorY-16,110); gl.addColorStop(0,'rgba(255,150,70,.34)'); gl.addColorStop(1,'rgba(255,150,70,0)'); g.fillStyle=gl; g.fillRect(VW*.24-110,floorY-126,220,220);
+    for(let i=0;i<7;i++){ const ph=(time*0.8+i/7)%1, ex=VW*.24+Math.sin(time*3+i*2)*4*ph, ey=floorY-44-ph*56; g.fillStyle='rgba(255,'+(120+Math.round(ph*90))+',60,'+(1-ph).toFixed(2)+')'; g.fillRect(Math.round(ex),Math.round(ey),2,2); }
+    const n=IMG.bonfire_n||10, fr=Math.floor(time*12)%n; g.drawImage(IMG.bonfire,fr*32,0,32,32,Math.round(VW*.24-32),Math.round(floorY-64),64,64); }
+  // landasan
+  if(IMG.anvil){const w=IMG.anvil.width*2, h=IMG.anvil.height*2; g.drawImage(IMG.anvil,Math.round(VW*.74-w/2),Math.round(floorY-h+4),w,h);}
+  // debu melayang
+  for(let i=0;i<14;i++){ const mx=(i*73+time*5)%RW, my=wallY+((i*37)%Math.max(1,floorY-wallY))+Math.sin(time+i)*3; g.fillStyle='rgba(255,230,190,.16)'; g.fillRect(Math.round(mx),Math.round(my),1,1); }
+  // penempa (karakter kedua) berdiri di dekat anvil, menghadap ke anvil
+  const ph=SPR.hero2&&SPR.hero2.idle, sm=smithSheet(); if(ph&&sm){ g.save(); g.translate(Math.round(VW*.9),Math.round(floorY-ph.fh*2+10)); g.scale(-1,1); g.drawImage(sm,Math.floor(time*6)%ph.n*ph.fw,0,ph.fw,ph.fh,-ph.fw,0,ph.fw*2,ph.fh*2); g.restore(); }
+  // hotspot (koordinat dunia)
+  { const aw=IMG.anvil?IMG.anvil.width:26, ah=IMG.anvil?IMG.anvil.height:28;
+    REST_HOT={bonfire:{x:VW*.24-32,y:floorY-64,w:64,h:64,act:'bHeal',label:'SEMBUHKAN'},
+      anvil:{x:VW*.74-aw,y:floorY-ah*2+4,w:aw*2,h:ah*2,act:'bForge',label:'ASAH SENJATA'},
+      smith:{x:VW*.9-24,y:floorY-64,w:48,h:64,fn:talkSmith,label:'BICARA'},
+      table:{x:VW*1.6-48,y:floorY-36,w:96,h:40,act:'bPowerUp',label:'ISI POWER'},
+      shelf:{x:VW*1.42,y:floorY-54,w:100,h:40,fn:talkShelf,label:'RAK BOTOL'},
+      crate:{x:24,y:floorY-70,w:24,h:34,label:'PERIKSA PETI'},
+      barrel:{x:50,y:floorY-60,w:18,h:26,label:'PERIKSA TONG'}}; }
+  // knight (atau karakter pemain) di posisi REST.x, jalan atau diam, menghadap sesuai arah
+  { const climbing=!!REST.climb, anim=REST.moving||climbing, def=anim?heroDef('run'):heroDef('idle'); if(def){ const fr=climbing?Math.floor((REST.climbAnim||0)*6)%def.n:REST.moving?Math.floor(REST.walkT*10)%def.n:Math.floor(time*2)%def.n; const bob=anim?0:Math.sin(time*2.4)*.6;
+    g.save(); g.translate(Math.round(REST.x),0); if(REST.face<0)g.scale(-1,1);
+    g.drawImage(def.img,fr*def.fw,0,def.fw,def.fh,-def.fw,Math.round(floorY-def.fh*2+bob*2+4-REST.y),def.fw*2,def.fh*2);
+    g.restore();
+    const ns=nearSpot(); if(ns){ g.fillStyle='rgba(8,8,12,.75)'; g.fillRect(REST.x-40,floorY-def.fh*2-22-REST.y,80,11); txt('[E] '+REST_HOT[ns].label,REST.x,floorY-def.fh*2-20-REST.y,4,'#ffd27a','center'); } } }
+  // label di atas objek
+  for(const k of ['bonfire','anvil','smith','table','crate','barrel']){const r=REST_HOT[k]; g.fillStyle='rgba(8,8,12,.7)'; g.fillRect(r.x+r.w/2-44,r.y-14,88,11); txt(r.label,r.x+r.w/2,r.y-12,4.2,'#ffd27a','center');}
+  g.restore();
+  // petunjuk arah ke ruangan lain (layar, bukan dunia)
+  g.setTransform(S,0,0,S,0,0);
+  const hint=(t,x,al)=>{ g.font=''; const w=t.length*6+12; const hx=al==='right'?x-w:x; g.fillStyle='rgba(8,8,12,.8)'; g.fillRect(hx,VH*.12-9,w,16); txt(t,al==='right'?x-6:x+6,VH*.12-3,5,'#ffd27a',al); };
+  if(cam<RW-VW-2) hint('RUANG RAMUAN  >',VW-6,'right');
+  if(cam>2) hint('<  RUANG UTAMA',6,'left');
+  g.setTransform(1,0,0,1,0,0);
+}
+let REST_HOT={}; let REST={x:null,tx:null,face:1,walkT:0,moving:false,y:0,vy:0,ground:true}, talkI=-1;
+const SMITH_LINES=['Pedangmu masih bisa lebih tajam. Mau kuasai? Asah di anvil.','Tiap level kukerjakan lebih rapi. 25 koin per level, sampai LV5.','Kalau power-mu habis, isi ulang di ruang ini. 20 koin.'];
+let dlgT=null, dlgIv=null;
+function typeDlg(text){ const el=$('dlgTxt'); el.textContent=''; let i=0; clearInterval(dlgIv); dlgIv=setInterval(()=>{ el.textContent=text.slice(0,++i); if(i>=text.length) clearInterval(dlgIv); },22); }
+// potret kecil untuk dialog: frame dari sprite, diperbesar tanpa haluan
+function portraitOf(kind){
+  let src=null,sx=0,sy=0,sw=0,sh=0,dw=0,dh=0;
+  if(kind==='smith'&&SPR.hero2&&SPR.hero2.idle){const d=SPR.hero2.idle; src=smithSheet(); sw=d.fw; sh=d.fh; dw=sw*3; dh=sh*3;}
+  if(kind==='bonfire'&&IMG.bonfire){src=IMG.bonfire; sw=32; sh=32; dw=96; dh=96;}
+  if(kind==='anvil'&&IMG.anvil){src=IMG.anvil; sw=IMG.anvil.width; sh=IMG.anvil.height; dw=sw*3; dh=sh*3;}
+  if(kind==='table'&&IMG.alchemy){src=IMG.alchemy; sw=48; sh=32; dw=sw*3; dh=sh*3;}
+  if(!src) return null;
+  const c=document.createElement('canvas'); c.width=dw; c.height=dh; const x=c.getContext('2d'); x.imageSmoothingEnabled=false;
+  x.drawImage(src,0,0,sw,sh,0,0,dw,dh); return c.toDataURL();
+}
+function showDlg(name,text,kind){
+  const img=$('dlgImg'); const url=portraitOf(kind||'smith'); if(url) img.src=url;
+  $('dlgName').textContent=name; $('dlg').classList.add('on'); typeDlg(text); sfx('ui');
+  clearTimeout(dlgT); dlgT=setTimeout(()=>$('dlg').classList.remove('on'),6000);
+}
+const SHELF_LINES=['Botol hijau: ramuan penyembuh. Sisanya hanya ramuan biasa.','Botol merah dan biru: kuras perlahan, tapi isinya belum jelas untuk siapa.','Catatan di rak: jangan membangunkan Raja Slime sebelum lantai 6.'];
+let shelfI=-1;
+function talkShelf(){ shelfI=(shelfI+1)%SHELF_LINES.length; showDlg('RAK BOTOL',SHELF_LINES[shelfI],'table'); }
+// hadiah acak: makin dalam lantainya, makin banyak koin (sekali per kunjungan)
+const lootCoins=base=>Math.round(base+Math.random()*base*0.7+floor*1.5);
+function talkCrate(){
+  if(REST.lootOpened){ showDlg('PETI','Sudah kosong. Hanya debu dan serpihan kayu.','table'); return; }
+  const n=lootCoins(8); REST.lootOpened=true; P.coins+=n; sfx('chest'); refreshRest();
+  showDlg('PETI','Di bawah kain lusuh ada '+n+' koin. Kamu ambil semuanya.','table');
+}
+function talkBarrel(){
+  if(REST.barrelOpened){ showDlg('TONG','Hanya bau apek. Tidak ada yang tersisa.','table'); return; }
+  const n=lootCoins(4); REST.barrelOpened=true; P.coins+=n; sfx('pick'); refreshRest();
+  showDlg('TONG','Ada '+n+' koin tersembunyi di dasar tong.','table');
+}
+
+function talkSmith(){
+  talkI=(talkI+1)%SMITH_LINES.length;
+  showDlg('PENEMPA',SMITH_LINES[talkI],'smith');
+}
+function nearSpot(){ if(REST.x==null)return null; const pos={bonfire:VW*.24,anvil:VW*.74,smith:VW*.9,table:VW*1.6,shelf:VW*1.7,crate:36,barrel:59}; let best=null,bd=30; for(const k in pos){const d=Math.abs(REST.x-pos[k]); if(d<bd){bd=d;best=k;}} return best; }
+// rak yang bisa dinaiki + tangga di sisinya
+const SHELVES=[{x0:()=>VW*1.42,x1:()=>VW*1.42+100,h:44,lad:()=>VW*1.42-14,bottles:true},  // ruang ramuan
+  {x0:()=>20,x1:()=>70,h:44,lad:()=>76}];                                                  // loteng di ruang utama
+const ladderShelf=x=>SHELVES.find(sh=>Math.abs(x-sh.lad())<9)||null;
+const shelfUnder=x=>SHELVES.find(sh=>x>sh.x0()-2&&x<sh.x1()+2)||null;
+const shelfZone=x=>SHELVES.find(sh=>x>=Math.min(sh.x0(),sh.lad()-9)&&x<=Math.max(sh.x1(),sh.lad()+9))||null;
+function restUpdate(dt){
+  if(REST.x==null) REST.x=VW*.5;
+  // di HP: naik otomatis lewat tombol NAIK, turun dengan menahan ◀ di tangga
+  if(REST.climbT>0) REST.climbT-=dt;
+  const lsh=ladderShelf(REST.x), onLadder=!!lsh;
+  const up=!!(keys.KeyW||keys.ArrowUp)||REST.climbT>0, dn=!!(keys.KeyS||keys.ArrowDown)||(REST.hold<0&&onLadder&&REST.y>0);
+  // mulai naik / turun tangga
+  if(!REST.climb && onLadder && ((up&&!REST.upHeld)||REST.climbReq||(dn&&REST.y>0))){ REST.climb=true; REST.sh=lsh; }
+  REST.upHeld=up; REST.climbReq=false;
+  const sh=REST.sh||SHELVES[0];
+  let ix=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+(REST.hold||0);
+  if(REST.climb){
+    const v=up?60:dn?-60:0; REST.y=clamp(REST.y+v*dt,0,sh.h); REST.vy=0; ix=0;
+    REST.climbAnim=(REST.climbAnim||0)+Math.abs(v)*dt;
+    if(REST.y>=sh.h||REST.y<=0||!onLadder||(!up&&!dn)) REST.climb=false;
+    REST.ground=REST.y<=0||REST.y>=sh.h;
+  }
+  if(ix) REST.tx=null;
+  else if(REST.tx!=null){ const d=REST.tx-REST.x; ix=Math.abs(d)<2?0:Math.sign(d); if(!ix) REST.tx=null; }
+  let nx=clamp(REST.x+ix*72*dt,20,VW*2-20);
+  // sisi rak: kalau masih di bawah permukaan, tidak bisa menembus dari samping
+  const blk=shelfUnder(nx);
+  if(!REST.climb && blk && REST.y<blk.h-1){ nx = REST.x<=blk.x0() ? blk.x0()-2 : blk.x1()+2; }
+  REST.x=nx;
+  // lompat: hanya dari lantai atau dari permukaan rak (tidak dari bawah rak)
+  const under=shelfUnder(REST.x);
+  if(!REST.climb && up && !REST.upHeld && REST.ground && !onLadder && !(under&&REST.y<under.h-1)){ REST.vy=-262; REST.ground=false; }
+  if(!REST.climb){
+    REST.vy+=700*dt; REST.y-=REST.vy*dt;
+    const z=shelfZone(REST.x), sup=z?z.h:0;
+    if(REST.vy>=0 && REST.y<=sup && REST.y>=sup-14){ REST.y=sup; REST.vy=0; REST.ground=true; } // hanya mendarat dari dekat permukaan, bukan dari bawah
+    else if(REST.y<=0){ REST.y=0; REST.vy=0; REST.ground=true; }
+    else REST.ground=false;
+  }
+  REST.moving=!!ix; if(ix) REST.face=ix; if(ix) REST.walkT+=dt;
+}
+
+function restAct(k){
+  if(k==='bonfire'){ const b=$('bHeal'); if(b.disabled) showDlg('LENTERA','Api hangat, tapi kamu butuh 10 koin, atau HP-mu masih penuh.','bonfire'); else { b.click(); showDlg('LENTERA','Api hangat. Luka-lukamu mulai pulih.','bonfire'); } }
+  else if(k==='anvil'){ const b=$('bForge'); if(b.disabled) showDlg('ANVIL','Butuh koin lebih banyak, atau senjatamu sudah LV5.','anvil'); else { b.click(); showDlg('ANVIL','Dentingan palu. Senjatamu makin tajam.','anvil'); } }
+  else if(k==='shelf') talkShelf();
+  else if(k==='crate') talkCrate();
+  else if(k==='barrel') talkBarrel();
+  else if(k==='table'){ const b=$('bPowerUp'); if(b.disabled) showDlg('RAMUAN','Butuh 20 koin, dan kamu harus punya power untuk diisi ulang.','table'); else { b.click(); showDlg('RAMUAN','Ramuan mendidih. Power-mu terisi lagi.','table'); } }
+  else talkSmith();
+}
+function restInteract(){
+  const k=nearSpot(); if(!k){ say('Dekati lentera, anvil, atau penempa untuk berinteraksi.',2); return; }
+  restAct(k);
+}
+cv.addEventListener('pointerdown',e=>{
+  if(state!=='rest')return;
+  const r=cv.getBoundingClientRect(), sx=(e.clientX-r.left)*(cv.width/r.width)/S, sy=(e.clientY-r.top)*(cv.height/r.height)/S;
+  const lx=sx+(REST.cam||0), ly=sy; // koordinat dunia = layar + geseran kamera
+  const pos={bonfire:VW*.24,anvil:VW*.74,smith:VW*.9,table:VW*1.6,crate:36,barrel:59};
+  for(const k in REST_HOT){const h=REST_HOT[k]; if(lx>=h.x&&lx<=h.x+h.w&&ly>=h.y&&ly<=h.y+h.h){
+    REST.tx=pos[k]+(k==='bonfire'?-30:k==='anvil'?30:k==='smith'?-40:0);
+    if(k==='smith'){ talkSmith(); return; }
+    if(k==='shelf'){ talkShelf(); return; }
+    if(k==='crate'){ talkCrate(); return; }
+    if(k==='barrel'){ talkBarrel(); return; }
+    restAct(k); return; }}
+  if(lx>=20&&lx<=VW*2-20) REST.tx=lx;
+});
+function leaveRest(){ state='play'; showScreen(null); $('rtouch').classList.remove('on'); $('rest').classList.remove('touch'); }
+function refreshRest(){
+  const lv=P.wlv[P.wpn]||1;
+  $('restInfo').textContent='Koin '+P.coins+' · '+WDEF[P.wpn].name+' LV'+lv+' · HP '+Math.ceil(P.hp)+'/'+P.maxHp;
+  $('forgeCost').textContent=lv>=5?'MAX':String(25*lv);
+  $('bForge').disabled=lv>=5||P.coins<25*lv;
+  $('bHeal').disabled=P.coins<10||P.hp>=P.maxHp;
+  $('bPowerUp').disabled=P.coins<20||!PLIST.some(k=>P.pw[k]>0);
+}
+$('bHeal').onclick=()=>{ if(P.coins<10||P.hp>=P.maxHp)return; P.coins-=10; P.hp=Math.min(P.maxHp,P.hp+Math.round(P.maxHp*.5)); sfx('pot'); refreshRest(); };
+$('bForge').onclick=()=>{ const lv=P.wlv[P.wpn]||1; if(lv>=5||P.coins<25*lv)return; P.coins-=25*lv; P.wlv[P.wpn]=lv+1; sfx('chest'); say(WDEF[P.wpn].name+' naik ke LV'+(lv+1)+'!',2.2); refreshRest(); };
+$('bPowerUp').onclick=()=>{ if(P.coins<20)return; P.coins-=20; for(const k of PLIST) if(P.pw[k]>0) P.pw[k]=Math.min(5,P.pw[k]+1); sfx('ui'); refreshRest(); };
+$('bNextF').onclick=()=>{ leaveRest(); nextFloor(); };
 function nextFloor(){ sfx('portal'); floor++; score+=200; P.hp=Math.min(P.maxHp,P.hp+Math.round(P.maxHp*.4)); newFloor(); fade=1; }
 let fade=0;
 
@@ -850,8 +1133,10 @@ function drawEnemy(e){
   // Pose depan vs samping diputuskan oleh nextFront (pose.js): histeresis + tahan minimal 0,4 detik, supaya tidak berkedip di garis batas.
   if(nextFront(e,P.y-e.y,Math.abs(P.x-e.x),moving,frz,time)&&e.lastDraw){e.prevDraw=e.lastDraw;e.blendAt=time;}
   const front=!!e.front;
-  const def=front?sp.idle:sp.run;
-  const fr=front?frameOf(def,e.t,6):moving?frameOf(def,e.t,10):idleFrame(frz?0:e.t);
+  let def=front?sp.idle:sp.run;
+  let fr=front?frameOf(def,e.t,6):moving?frameOf(def,e.t,10):idleFrame(frz?0:e.t);
+  // Jenderal Orc: saat bersiap menyerang, animasi serang (ORC2/attack) mengikuti sisa waktu bersiap
+  if(e.type==='orc2Boss'&&e.wind>0&&SPR.orc2Atk){ const a=SPR.orc2Atk.idle; def=a; fr=Math.min(a.n-1,Math.floor((1-Math.max(0,e.wind)/.5)*a.n)); }
   const sq=e.squash, introK=e.intro>0?e.intro/1.1:0;
   const o={scale:e.scale*(1+introK*1.6),flash:e.flash/.14,flip:front?false:e.face<0,tint:frz?.55:0,bob:(!moving&&!front&&!frz)?breath(e.t):0,outline:e.elite?'gold':(e.wind>0&&Math.floor(e.t*20)%2?'red':null),
     stx:1+sq*.2-introK*.3,sty:1-sq*.2+introK*.5,alpha:e.intro>0?Math.max(.2,1-introK):1};
@@ -881,7 +1166,7 @@ function drawHeld(){
   const p=P,W=WDEF[p.wpn],art=heldArt(p.wpn,p.wlv[p.wpn]); let ang,ox,oy;
   if(p.atkT>0){const t=1-p.atkT/.3,a=p.atkAng,k=Math.min(1,t*1.7);
     if(W.thrust){ang=a;const off=Math.sin(k*Math.PI)*(W.reach-22);ox=Math.cos(a)*(6+off);oy=Math.sin(a)*(6+off);}
-    else if(W.type==='melee'){ang=a-1.3+k*2.6;ox=Math.cos(ang)*5;oy=Math.sin(ang)*5;}
+    else if(W.type==='melee'){const sd=Math.cos(a)<0?-1:1;ang=a+sd*(k*2.6-1.3);ox=Math.cos(ang)*5;oy=Math.sin(ang)*5;}
     else{ang=a;const rc=t<.3?-3*(1-t/.3):0;ox=Math.cos(a)*(7+rc);oy=Math.sin(a)*(7+rc);}
   }else{
     // ayunan idle lembut: sedikit berbeda saat diam vs berjalan, biar senjata terasa "hidup"
@@ -902,11 +1187,11 @@ function drawPlayer(){
   if(blink)return;
   const moving=p.moving||p.dashT>0;
   const front=!moving&&p.atkT<=0&&p.fy>.7;
-  const def=front?SPR.knight.idle:SPR.knight.run; const fr=front?frameOf(def,time,6):moving?frameOf(def,time,p.dashT>0?18:10):idleFrame(time);
+  const def=front?heroDef('idle'):heroDef('run'); const fr=front?frameOf(def,time,6):moving?frameOf(def,time,p.dashT>0?18:10):idleFrame(time);
   let bx=0,by=0;if(p.atkT>0){const k=Math.min(1,(1-p.atkT/.3)*1.6),l=Math.sin(k*Math.PI),W=WDEF[p.wpn],a=p.atkAng,dr=W.type==='melee'?1:-.6;bx=Math.cos(a)*l*3*dr;by=Math.sin(a)*l*1.5*dr;}
   bodyOff.x=bx;bodyOff.y=by;
   shadow(p.x,p.y,6);
-  for(const gtr of trail){const a=Math.max(0,1-gtr.t/.24)*.4;if(a>0)drawGhost(SPR.knight.run,2,gtr.x,gtr.y,gtr.flip,a);}
+  for(const gtr of trail){const a=Math.max(0,1-gtr.t/.24)*.4;if(a>0)drawGhost(heroDef('run'),2,gtr.x,gtr.y,gtr.flip,a);}
   const behind=p.atkT>0&&Math.sin(p.atkAng)<-.3;
   if(behind)drawHeld();
   const sq=p.squash;
@@ -923,10 +1208,11 @@ function drawSlash(){
     const len=R*Math.min(1,t*3);g.globalAlpha=Math.max(0,al)*.8;g.strokeStyle=p.buffDmg>0?'#ffe38a':W.col;g.lineWidth=2.5;g.lineCap='round';
     g.beginPath();g.moveTo(cx+Math.cos(a)*10,cy+Math.sin(a)*10);g.lineTo(cx+Math.cos(a)*len,cy+Math.sin(a)*len);g.stroke();
   }else{
-    const A=W.arc,a0=a-A+t*(A*.4),a1=a+A;
+    // sd = arah ayunan: +1 menghadap kanan (ayun atas->bawah), -1 menghadap kiri (cermin)
+    const A=W.arc,sd=Math.cos(a)<0?-1:1,lead=a+sd*A,trail=a-sd*A+sd*t*(A*.4);
     g.globalAlpha=Math.max(0,al)*.95; g.fillStyle=p.buffDmg>0?'#ffe38a':W.col;
-    g.beginPath(); g.arc(cx,cy,R,a0,a1); g.arc(cx-Math.cos(a)*5,cy-Math.sin(a)*5,R-10,a1,a0,true); g.closePath(); g.fill();
-    g.globalAlpha=Math.max(0,al)*.6; g.fillStyle='#fff'; g.beginPath(); g.arc(cx,cy,R-1,a1-.5,a1); g.arc(cx,cy,R-4,a1,a1-.5,true); g.fill();
+    g.beginPath(); g.arc(cx,cy,R,trail,lead,sd<0); g.arc(cx-Math.cos(a)*5,cy-Math.sin(a)*5,R-10,lead,trail,sd>0); g.closePath(); g.fill();
+    g.globalAlpha=Math.max(0,al)*.6; g.fillStyle='#fff'; g.beginPath(); g.arc(cx,cy,R-1,lead-sd*.5,lead,sd<0); g.arc(cx,cy,R-4,lead,lead-sd*.5,sd>0); g.fill();
   }
   g.restore();
 }
@@ -936,6 +1222,7 @@ function drawFx(){
     else{g.save();const gr=g.createRadialGradient(q.x,q.y,0,q.x,q.y,8);gr.addColorStop(0,'#fff');gr.addColorStop(.35,'#ffb04a');gr.addColorStop(1,'rgba(255,90,20,0)');g.fillStyle=gr;g.beginPath();g.arc(q.x,q.y,8,0,6.283);g.fill();g.restore();}
   }
   for(const f of fx){
+    if(f.k==='anim'){const d=SPR[f.sp]&&SPR[f.sp].idle;if(d){const fr=Math.min(d.n-1,Math.floor(f.t/f.life*d.n));drawSpr(d,fr,f.x,f.y,{scale:f.scale,alpha:Math.max(0,1-f.t/f.life*.6)});}continue;}
     if(f.k==='ring'){const a=Math.max(0,1-f.r/f.max);g.save();g.strokeStyle='rgba('+f.rgb+','+(a*.9)+')';g.lineWidth=3;g.beginPath();g.ellipse(f.x,f.y,f.r,f.r*.8,0,0,6.283);g.stroke();g.fillStyle='rgba('+f.rgb+','+(a*.15)+')';g.fill();g.restore();}
     else{const a=1-f.t/f.life;g.save();g.lineJoin='round';
       for(const w of [[5,'rgba(255,225,74,'+(a*.35)+')'],[2,'rgba(255,255,255,'+a+')']]){g.lineWidth=w[0];g.strokeStyle=w[1];g.beginPath();f.pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.stroke();}g.restore();}
@@ -951,7 +1238,9 @@ function drawBanners(){ // obor dinding berwarna (dari DarkDungeon.png) + cahaya
     const im=ART.torch[b.c], rgb=TORCH_RGB[b.c]||'255,165,70';
     const flick=.5+.3*Math.sin(time*9+b.x)+.2*Math.sin(time*23+b.y);
     const gy=b.y+13;
-    if(im) g.drawImage(im,Math.round(b.x-im.width/2),Math.round(b.y+14-im.height));
+    const ft=IMG.firetorch; // obor animasi (16x16 Dungeon tileset), tiap obor mulai di frame berbeda
+    if(ft){const n=Math.max(1,ft.width/20|0),fr=Math.floor(time*14+b.x*.37)%n;g.drawImage(ft,fr*20,0,20,29,Math.round(b.x-10),Math.round(b.y+14-29),20,29);}
+    else if(im) g.drawImage(im,Math.round(b.x-im.width/2),Math.round(b.y+14-im.height));
     g.save(); g.globalCompositeOperation='lighter';
     const gr=g.createRadialGradient(b.x,gy,0,b.x,gy,34);
     gr.addColorStop(0,'rgba('+rgb+','+Math.max(0,.2*flick)+')'); gr.addColorStop(1,'rgba('+rgb+',0)');
@@ -969,7 +1258,7 @@ function drawDust(){
 }
 function drawPortal(){
   const pt=L.portal,t=time; const open=pt.open; const x=Math.round(pt.x),y=Math.round(pt.y);
-  if(floor===3)return;
+  if(isBoss(floor)&&bossRef)return;
   g.save();
   g.fillStyle='rgba(0,0,0,.4)';g.beginPath();g.ellipse(x,y+6,14,6,0,0,6.283);g.fill();
   const col=open?['#59ffe0','#2aa8ff','#c8fff4']:['#7a3a3a','#4a2020','#a05a5a'];
@@ -983,7 +1272,8 @@ function drawPortal(){
 function drawWorld(){
   g.save();
   g.setTransform(S,0,0,S,0,0);
-  const sx=shake>0?rf(-shake,shake)*.5:0, sy=shake>0?rf(-shake,shake)*.5:0;
+  const amp=Math.min(shake,5)*.14; // guncangan dibatasi dan dibuat halus
+  const sx=shake>0?rf(-amp,amp):0, sy=shake>0?rf(-amp,amp):0;
   const cx=Math.round(camX+sx), cy=Math.round(camY+sy);
   g.fillStyle='#06080d';g.fillRect(0,0,VW,VH);
   g.translate(-cx,-cy);
@@ -1053,7 +1343,7 @@ function drawSpecial(k,bob){
   g.restore();
 }
 function objective(){
-  if(floor===3){return bossRef?{x:bossRef.x,y:bossRef.y}:null;}
+  if(isBoss(floor)&&bossRef){return {x:bossRef.x,y:bossRef.y};}
   if(P.key)return {x:L.portal.x,y:L.portal.y};
   const k=pickups.find(p=>p.type==='key'); if(k)return {x:k.x,y:k.y};
   if(L.elite)return {x:L.elite.x,y:L.elite.y};
@@ -1099,40 +1389,49 @@ function txtWrapped(s,cx,y,size,col,maxW,lineGap){
 function drawHUD(){
   g.save();g.setTransform(1,0,0,1,0,0);g.imageSmoothingEnabled=false;
   const u=HU*2, pad=8*HU, F=4*u; // base
+  // potret karakter (frame dari All_Assets) di kiri, HP bar di sebelah kanannya
+  const x=pad, y=pad, PS=16*HU, hx=x+PS+3*HU;
+  if(IMG.ui_portrait){g.drawImage(IMG.ui_portrait,x,y,PS,PS*60/63); // bingkai dulu, lalu karakter di dalam lingkaran
+    const kd=heroDef('idle'); if(kd){const sc=(PS*.9)/kd.fh; g.save(); g.beginPath(); g.arc(x+PS/2,y+PS/2,PS*.36,0,6.283); g.clip();
+      g.drawImage(kd.img,kd.fw,0,kd.fw,kd.fh,Math.round(x+PS/2-kd.fw*sc/2),Math.round(y+PS-kd.fh*sc*.92),kd.fw*sc,kd.fh*sc); g.restore();}}
   // HP bar
-  const bw=64*HU,bh=8*HU,x=pad,y=pad;
-  g.fillStyle='#000';g.fillRect(x-HU,y-HU,bw+2*HU,bh+2*HU);g.fillStyle='#3a0e12';g.fillRect(x,y,bw,bh);
-  const hr=clamp(P.hp/P.maxHp,0,1);g.fillStyle=hr>.3?'#e8403c':'#ff7a3a';g.fillRect(x,y,bw*hr,bh);
-  g.fillStyle='rgba(255,255,255,.25)';g.fillRect(x,y,bw*hr,Math.max(1,HU*2));
-  txt(Math.ceil(P.hp)+'/'+P.maxHp,x+bw/2,y+bh/2-2.5*HU,4*HU+2,'#fff','center');
+  const bw=64*HU,bh=8*HU;
+  g.fillStyle='#000';g.fillRect(hx-HU,y-HU,bw+2*HU,bh+2*HU);g.fillStyle='#3a0e12';g.fillRect(hx,y,bw,bh);
+  const hr=clamp(P.hp/P.maxHp,0,1);g.fillStyle=hr>.3?'#e8403c':'#ff7a3a';g.fillRect(hx,y,bw*hr,bh);
+  g.fillStyle='rgba(255,255,255,.25)';g.fillRect(hx,y,bw*hr,Math.max(1,HU*2));
+  txt(Math.ceil(P.hp)+'/'+P.maxHp,hx+bw/2,y+bh/2-2.5*HU,4*HU+2,'#fff','center');
+  if(P.shield>0&&IMG.ui_shield){const sz=12*HU,sx=hx+bw+4*HU;g.drawImage(IMG.ui_shield,sx,y-HU,sz,sz);txt('hx'+Math.max(0,P.shieldHits),sx+sz+2*HU,y+2*HU,4*HU,'#9fd2ff');}
   // dash bar
-  const dr=1-P.dashCD/.85;g.fillStyle='#000';g.fillRect(x-HU,y+bh+2*HU,bw*.5+2*HU,3*HU+2*HU);g.fillStyle=dr>=1?'#6aa8ff':'#2a3d66';g.fillRect(x,y+bh+3*HU,bw*.5*clamp(dr,0,1),3*HU);
-  txt('DASH',x+bw*.5+4*HU,y+bh+2.5*HU,4*HU,dr>=1?'#9cc6ff':'#55678e');
+  const dr=1-P.dashCD/.85;g.fillStyle='#000';g.fillRect(hx-HU,y+bh+2*HU,bw*.5+2*HU,3*HU+2*HU);g.fillStyle=dr>=1?'#6aa8ff':'#2a3d66';g.fillRect(hx,y+bh+3*HU,bw*.5*clamp(dr,0,1),3*HU);
+  txt('DASH',hx+bw*.5+4*HU,y+bh+2.5*HU,4*HU,dr>=1?'#9cc6ff':'#55678e');
   // coins/key/floor
   const iy=y+bh+11*HU;
-  g.drawImage(IMG.coin,x,iy,IMG.coin.width*HU,IMG.coin.height*HU); txt(String(P.coins),x+10*HU,iy+1*HU,5*HU,'#ffd84a');
+  if(IMG.ui_pouch){g.drawImage(IMG.ui_pouch,x,iy-HU,13*HU,13*HU);} else g.drawImage(IMG.coin,x,iy,IMG.coin.width*HU,IMG.coin.height*HU);
+  txt(String(P.coins),x+(IMG.ui_pouch?15:10)*HU,iy+1*HU,5*HU,'#ffd84a');
   if(P.key){g.drawImage(IMG.key,x+30*HU,iy+1*HU,IMG.key.width*HU,IMG.key.height*HU);}
-  txt('LANTAI '+floor+'/3',x,iy+14*HU,4*HU+1,'#c9d4ea');
+  txt('LANTAI '+floor+'/'+FINAL,x,iy+14*HU,4*HU+1,'#c9d4ea');
   txt('SKOR '+score,x,iy+22*HU,4*HU+1,'#9ff');
-  // weapon & power slots
-  {const sw=13*HU,sy=iy+31*HU;
-    WLIST.forEach((w,i)=>{const sx=x+i*(sw+HU),own=P.own[w],cur=P.wpn===w;
+  if((P.combo||0)>=2)txt('KOMBO x'+P.combo,x,iy+31*HU,4*HU+1,'#ffd84a');
+  // hotbar bawah tengah (gaya Minecraft): senjata di baris bawah, power di atasnya
+  {const sw=13*HU,ps=11*HU,hw=5*(sw+HU)-HU,hx=Math.round((CW-hw)/2),sy=CH-pad-sw;
+    WLIST.forEach((w,i)=>{const sx=hx+i*(sw+HU),own=P.own[w],cur=P.wpn===w;
       g.globalAlpha=.78;g.fillStyle='#000';g.fillRect(sx,sy,sw,sw);g.globalAlpha=1;g.fillStyle=cur?'#3a2f10':'#10151f';g.fillRect(sx+HU/2,sy+HU/2,sw-HU,sw-HU);
       g.globalAlpha=own?1:.18;g.drawImage(slotArt(w,P.wlv[w]||1),sx+(sw-24*HU/2)/2,sy+(sw-24*HU/2)/2,24*HU/2,24*HU/2);g.globalAlpha=1;
       if(cur){g.strokeStyle='#ffcf4a';g.lineWidth=Math.max(1,HU);g.strokeRect(sx+HU/2,sy+HU/2,sw-HU,sw-HU);}
       txt(String(i+1),sx+1.5*HU,sy+1.5*HU,3.8*HU,own?'#9aa7c2':'#3a4660');
       if(own&&(P.wlv[w]||1)>1)txt('L'+P.wlv[w],sx+sw-HU,sy+sw-5*HU,3.8*HU,'#ffcf4a','right');});
-    const py=sy+sw+3*HU,ps=11*HU;let n=0;
-    PLIST.forEach(k=>{const c=P.pw[k];if(!(c>0))return;const sx=x+n*(ps+HU),cur=P.psel===k;n++;
+    const owned=PLIST.filter(k=>P.pw[k]>0), pw=owned.length*(ps+HU)-HU, px0=Math.round((CW-pw)/2), py=sy-ps-3*HU;
+    owned.forEach((k,n)=>{const c=P.pw[k],sx=px0+n*(ps+HU),cur=P.psel===k;
       g.globalAlpha=.78;g.fillStyle='#000';g.fillRect(sx,py,ps,ps);g.globalAlpha=1;{const oa=ART.orb[k];if(oa){const os=ps*.84;g.drawImage(oa,sx+(ps-os)/2,py+(ps-os)/2,os,os);}else{g.fillStyle=PDEF[k].col;g.beginPath();g.arc(sx+ps/2,py+ps/2,ps*.28,0,6.283);g.fill();}}
       if(cur){g.strokeStyle='#fff';g.lineWidth=Math.max(1,HU);g.strokeRect(sx+HU/2,py+HU/2,ps-HU,ps-HU);}
       txt('x'+c,sx+ps-HU,py+ps-5*HU,3.8*HU,'#fff','right');});
-    if(P.pcd>0&&n){g.globalAlpha=.5;g.fillStyle='#000';g.fillRect(x,py,n*(ps+HU),ps*(P.pcd/.7));g.globalAlpha=1;}
+    if(P.pcd>0&&owned.length){g.globalAlpha=.5;g.fillStyle='#000';g.fillRect(px0,py,pw,ps*(P.pcd/.7));g.globalAlpha=1;}
   }
   // minimap
   if(L.miniDirty&&time-L.miniT>.15){L.miniT=time;L.miniDirty=false;const m=L.miniCtx;m.clearRect(0,0,MW,MH);
     for(let yy=0;yy<MH;yy++)for(let xx=0;xx<MW;xx++){const n=xx+yy*MW;if(L.explored[n]){m.fillStyle=L.grid[n]?'#3f5a78':'#141b28';m.fillRect(xx,yy,1,1);}}}
   const ms=Math.max(2,Math.floor(HU*1.6)),mw=MW*ms,mh=MH*ms,mx=CW-mw-pad,my=pad;
+  if(IMG.ui_map){const iw=14*HU,ih=iw*43/49;g.drawImage(IMG.ui_map,mx-iw-2*HU,my,iw,ih);}
   g.globalAlpha=.88;g.fillStyle='#000';g.fillRect(mx-HU,my-HU,mw+2*HU,mh+2*HU);g.fillStyle='#0a0e16';g.fillRect(mx,my,mw,mh);g.drawImage(L.mini,mx,my,mw,mh);g.globalAlpha=1;
   const o=objective(); if(o){const ox=o.x/TILE|0,oy=o.y/TILE|0;if(L.explored[ox+oy*MW]||P.key||true){g.fillStyle='#ffcf4a';g.fillRect(mx+ox*ms-1,my+oy*ms-1,ms+2,ms+2);}}
   g.fillStyle='#fff';g.fillRect(mx+(P.x/TILE|0)*ms-1,my+(P.y/TILE|0)*ms-1,ms+2,ms+2);
@@ -1141,7 +1440,7 @@ function drawHUD(){
   // message (dibungkus biar tidak meluber di layar sempit)
   if(msg.t>0){const a=Math.min(1,msg.t*2);g.globalAlpha=a;const msz=(CH>CW?4.2:4.6)*HU+1;txtWrapped(msg.s,CW/2,CH>CW?CH*.3:CH*.14,msz,'#fff',CW-pad*4);g.globalAlpha=1;}
   // boss bar
-  if(bossRef){const w=Math.min(CW*.6,160*HU),bx=(CW-w)/2,byy=CH-18*HU;g.fillStyle='#000';g.fillRect(bx-HU,byy-HU,w+2*HU,7*HU+2*HU);g.fillStyle='#3a0e12';g.fillRect(bx,byy,w,7*HU);g.fillStyle='#c93a2a';g.fillRect(bx,byy,w*clamp(bossRef.hp/bossRef.maxHp,0,1),7*HU);txt('RAJA ORC',CW/2,byy-7*HU,4.4*HU+1,'#ffb48a','center');}
+  if(bossRef){const w=Math.min(CW*.6,160*HU),bx=(CW-w)/2,byy=CH>CW?pad+mh+12*HU:pad+10*HU;g.fillStyle='#000';g.fillRect(bx-HU,byy-HU,w+2*HU,7*HU+2*HU);g.fillStyle='#3a0e12';g.fillRect(bx,byy,w,7*HU);g.fillStyle='#c93a2a';g.fillRect(bx,byy,w*clamp(bossRef.hp/bossRef.maxHp,0,1),7*HU);txt(BOSS_NAME[bossRef.type]||'BOS',CW/2,byy+9*HU,4.4*HU+1,'#ffb48a','center');}
   g.restore();
 }
 function drawTitleScene(){
@@ -1200,7 +1499,7 @@ function refreshLabels(){ if(!P)return; const a=WDEF[P.wpn].name, has=P.pw[P.pse
   if(a!==lblA){lblA=a;$('tSwap').textContent=a;}
   if(b!==lblB){lblB=b;$('tPowerL').textContent=b;$('tPower').style.borderColor=has?PDEF[P.psel].col:'';}
   $('tPower').style.setProperty('--cd',clamp(P.pcd/.7,0,1)); $('tDash').style.setProperty('--cd',clamp(P.dashCD/.85,0,1)); }
-function frame(now){
+function frameInner(now){
   let dt=Math.min(.05,(now-last)/1000); last=now; refreshLabels();
   if(L&&P){
     if(fade>0)fade=Math.max(0,fade-dt*1.6);
@@ -1208,8 +1507,12 @@ function frame(now){
       if(hitstop>0){hitstop-=dt;}else update(dt);
       setCam(false); drawWorld(); drawVignette(); drawHUD();
     }else if(state==='title'||state==='splash'){ time+=dt; drawTitleScene(); }
-    else if(state==='pause'||state==='over'||state==='win'){ if(state!=='pause'){time+=dt;} drawWorld(); drawVignette(); }
+    else if(state==='pause'||state==='over'||state==='win'||state==='rest'){ if(state!=='pause'){time+=dt;} if(state==='rest'){refreshRest(); restUpdate(dt); drawRestRoom();} else {drawWorld(); drawVignette();} }
   }
+}
+// pengaman: satu frame yang error tidak boleh menghentikan seluruh game loop
+function frame(now){
+  try{ frameInner(now); }catch(e){ console.error('frame error:',e); }
   requestAnimationFrame(frame);
 }
 
@@ -1232,5 +1535,13 @@ try{document.fonts&&document.fonts.load('8px "Press Start 2P"').catch(()=>{});}c
 window.NACI={get msg(){return msg;},get state(){return state;},get P(){return P;},get L(){return L;},get ents(){return ents;},get floor(){return floor;},start:startGame,
   setFloor(n){floor=n;newFloor();setCam(true);},get pickups(){return pickups;},get chests(){return chests;},get crystals(){return crystals;},get proj(){return projs;},
   kill(){for(const e of ents.slice())killEnemy(e);},give(){for(const w of WLIST)P.own[w]=1;for(const k of PLIST)P.pw[k]=3;},use:usePower,swap:swapWeapon,setW:setWeapon,get pproj(){return pproj;},openLayout,closeLayout,tp(x,y){P.x=x;P.y=y;setCam(true);}};
-loadAll().then(()=>{ P=newPlayer(); titleInit(); requestAnimationFrame(frame); spA=true; if(spT)leaveSplash(); });
+function addIcons(){ // ikon kecil di tombol menu (aset All_Assets)
+  const map={bPlay:'sword',bHow:'info',bLayout:'settings',bLayout2:'settings',bCred:'monsterbook',bDonate:'goblet',bResume:'shield'};
+  for(const id in map){const b=$(id),src=ASSETS.images&&ASSETS.images['ui_'+map[id]];if(!b||!src||b.querySelector('img.bic'))continue;
+    const im=document.createElement('img');im.src=src;im.className='bic';im.alt='';b.insertBefore(im,b.firstChild);}
+}
+// mulai permainan walau ada aset yang lambat: setelah 12 detik tetap lanjut dengan yang sudah termuat
+const startNow=()=>{ if(P)return; P=newPlayer(); titleInit(); addIcons(); requestAnimationFrame(frame); spA=true; if(spT)leaveSplash(); };
+Promise.race([loadAll(),new Promise(r=>setTimeout(r,12000))]).then(startNow);
+window.addEventListener('unhandledrejection',e=>console.error('promise error:',e.reason));
 })();

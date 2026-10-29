@@ -39,7 +39,7 @@
 <div class="screen" id="title">
   <div class="brand">NaciTwo games presents</div>
   <h1 class="logo">NACI<br> CRYPT</h1>
-  <p class="sub">Turun ke dalam kripta. Kalahkan kerangka dan orc, rebut kunci dari penjaga bersinar emas, lalu hadapi Raja Orc di lantai terakhir.</p>
+  <p class="sub">Turun ke dalam kripta. Kalahkan kerangka dan orc, rebut kunci dari penjaga berbingkai emas, hadapi Raja Orc di lantai 3, Raja Slime di lantai 6, dan Penjaga Pohon di lantai 9, dan Jenderal Orc di lantai 10.</p>
   <div class="btns">
     <button class="b pri" id="bPlay">MULAI MAIN</button>
     <button class="b" id="bHow">CARA BERMAIN</button>
@@ -62,12 +62,12 @@
     <div><span class="k">Jeda</span> &nbsp;<kbd>P</kbd> / <kbd>ESC</kbd> &nbsp; <span class="k">Suara</span> <kbd>M</kbd></div>
     <div class="m">Layar sentuh: joystick + SERANG / DASH / GANTI (senjata) / POWER (ketuk panah di sudutnya untuk ganti power). Susun ulang tombol lewat menu ATUR TOMBOL.</div>
     <br>
-    <div><span class="k">Tujuan:</span> Di lantai 1&ndash;2, kalahkan penjaga <b style="color:var(--gold);font-weight:400">berbingkai emas</b> untuk mendapat kunci, lalu masuk ke portal. Di lantai 3, kalahkan Raja Orc.</div>
+    <div><span class="k">Tujuan:</span> Di lantai 1, 2, 4, 5, 7, dan 8, kalahkan penjaga <b style="color:var(--gold);font-weight:400">berbingkai emas</b> untuk mendapat kunci, lalu masuk ke portal. Di lantai 3, 6, dan 9, kalahkan bos untuk membuka portal. Di lantai 10, kalahkan Jenderal Orc untuk menang.</div>
     <div><span class="k">Item:</span> koin &amp; permata = skor, ramuan merah = nyawa, biru = lari cepat, kuning = serangan kuat. Buka peti untuk peningkatan permanen.</div>
     <div><span class="k">Senjata:</span> Pedang, Tombak (jangkauan jauh), Kapak (putar, keras), Busur, Tongkat api. Dapat senjata yang sama lagi atau peti tertentu = naik level (maks 5). Panah &amp; api bisa menangkis tembakan musuh.</div>
     <div><span class="k">Power:</span> bola cahaya &mdash; <span style="color:#ff9a4a">Nova</span> ledakan, <span style="color:#ffe14a">Petir</span>, <span style="color:#5ab4ff">Perisai</span>, <span style="color:#9ff0ff">Beku</span>.</div>
     <div><span class="k">Kristal:</span> pukul / tembak untuk memecahkannya &mdash; jatuh permata &amp; bijih. Nova memecahkan semua kristal di sekitarmu.</div>
-    <div><span class="k">Buku Kuno:</span> ada di lantai 2&ndash;3, memberi peningkatan permanen. Senjata berganti tampilan tiap naik level.</div>
+    <div><span class="k">Buku Kuno:</span> ada di lantai 2&ndash;6, memberi peningkatan permanen. Senjata berganti tampilan tiap naik level.</div>
     <div class="m">Panah emas di dekat karaktermu menunjuk tujuan berikutnya.</div>
   </div>
   <div class="btns"><button class="b" data-back>KEMBALI</button></div>
@@ -80,7 +80,7 @@
     <div><span class="k">Kampus</span><br>Universitas Pamulang &mdash; Teknik Informatika</div>
     <div><span class="k">Kontak</span><br>ican3192@gmail.com</div>
     <br>
-    <div><span class="k">Aset seni</span><br>Pixel Crawler (Free Pack) oleh Anokolisa<br>DarkDungeon &amp; Mini Dungeon Tileset (Atomic Realm)<br>RPG Items 16x16 &middot; Crystals and Ore 24x24</div>
+    <div><span class="k">Aset seni</span><br>Pixel Crawler (Free Pack) oleh Anokolisa<br>DarkDungeon &amp; Mini Dungeon Tileset (Atomic Realm)<br>RPG Items 16x16 &middot; Crystals and Ore 24x24<br>THE_PACK oleh pixel_ankousse (monster baru)<br>16x16 Dungeon Tileset oleh Rowan Luff (lantai kripta, obor)</div>
     <div class="m">Efek suara &amp; musik dibuat langsung dengan WebAudio.</div>
     <br>
     <div><span class="k">Dukung pembuat</span><br><a href="https://sociabuzz.com/nacitwo/tribe" target="_blank" rel="noopener" style="color:inherit">sociabuzz.com/nacitwo/tribe</a></div>
@@ -99,6 +99,26 @@
   </div>
 </div>
 
+<div class="screen" id="rest">
+  <h2 class="logo" style="font-size:clamp(20px,5vw,36px)">RUANG ISTIRAHAT</h2>
+  <div class="sub" id="restInfo"></div>
+  <div class="rtouch" id="rtouch">
+    <button class="rb" id="rbL" aria-label="kiri">&#9664;</button>
+    <button class="rb" id="rbR" aria-label="kanan">&#9654;</button>
+    <button class="rb" id="rbJ">LOMPAT</button>
+    <button class="rb pri" id="rbE">INTERAKSI</button>
+  </div>
+  <div class="dlg" id="dlg" onclick="this.classList.remove('on')">
+    <img id="dlgImg" alt="">
+    <div><b id="dlgName">PENEMPA</b><p id="dlgTxt"></p><small>klik untuk menutup</small></div>
+  </div>
+  <div class="btns">
+    <button class="b" id="bHeal">SEMBUHKAN (10 koin)</button>
+    <button class="b" id="bForge">ASAH SENJATA (<span id="forgeCost">25</span> koin)</button>
+    <button class="b" id="bPowerUp">ISI POWER (20 koin)</button>
+    <button class="b pri" id="bNextF">TURUN KE LANTAI</button>
+  </div>
+</div>
 <div class="screen" id="over">
   <h2 class="logo" style="color:#ff6a5a;text-shadow:0 4px 0 #5a1208;font-size:clamp(22px,6vw,44px)">KAMU GUGUR</h2>
   <div class="stat" id="overStat"></div>
@@ -121,6 +141,7 @@
 
 <script src="assets.js"></script>
 <script src="assets2.js"></script>
+<script src="assets3.js"></script>
 <script src="layout.js"></script>
 <script src="pose.js"></script>
 <script src="game.js"></script>
